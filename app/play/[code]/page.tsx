@@ -263,50 +263,54 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
                       </div>
                     </div>
 
-                    {/* Score buttons */}
-                    <div className="flex gap-1.5 flex-wrap">
-                      {Array.from({ length: 10 }, (_, i) => i + 1).map(score => {
-                        const pts = getStablefordPoints(score, activeHole - 1, player.handicap);
-                        const isSelected = currentGross === score;
-                        let bgColor = 'bg-gray-100 hover:bg-gray-200';
-                        if (isSelected) {
-                          if (pts === 0) bgColor = 'bg-red-500 text-white';
-                          else if (pts === 1) bgColor = 'bg-orange-400 text-white';
-                          else if (pts === 2) bgColor = 'bg-gray-600 text-white';
-                          else if (pts === 3) bgColor = 'bg-blue-500 text-white';
-                          else bgColor = 'bg-purple-600 text-white';
-                        }
+                    {/* +/- Score stepper */}
+                    {(() => {
+                      const displayScore = currentGross || par;
+                      const diff = displayScore - par;
+                      const label = diff <= -2 ? 'Eagle' : diff === -1 ? 'Birdie' : diff === 0 ? 'Par' : diff === 1 ? 'Bogey' : diff === 2 ? 'Double' : `+${diff}`;
+                      const pts = getStablefordPoints(displayScore, activeHole - 1, player.handicap);
+                      const labelColor = pts === 0 ? 'text-red-500' : pts === 1 ? 'text-orange-500' : pts === 2 ? 'text-gray-600' : pts === 3 ? 'text-blue-600' : 'text-purple-600';
+                      const scoreColor = pts === 0 ? 'bg-red-50 border-red-200' : pts === 1 ? 'bg-orange-50 border-orange-200' : pts === 2 ? 'bg-gray-50 border-gray-200' : pts === 3 ? 'bg-blue-50 border-blue-200' : 'bg-purple-50 border-purple-200';
 
-                        return (
+                      return (
+                        <div className="flex items-center gap-3">
                           <button
-                            key={score}
-                            onClick={() => saveScore(player.id, activeHole, score)}
-                            disabled={saving}
-                            className={`w-10 h-10 rounded-lg font-bold text-sm transition-colors ${bgColor} disabled:opacity-50`}
+                            onClick={() => {
+                              const newScore = Math.max(1, displayScore - 1);
+                              saveScore(player.id, activeHole, newScore);
+                            }}
+                            disabled={saving || displayScore <= 1}
+                            className="w-14 h-14 rounded-xl bg-blue-100 text-blue-700 text-2xl font-bold hover:bg-blue-200 active:bg-blue-300 transition-colors disabled:opacity-30"
                           >
-                            {score}
+                            −
                           </button>
-                        );
-                      })}
-                      {currentGross && (
-                        <button
-                          onClick={() => clearScore(player.id, activeHole)}
-                          className="w-10 h-10 rounded-lg text-xs text-red-500 border border-red-200 hover:bg-red-50"
-                        >
-                          X
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Points feedback */}
-                    {currentGross && (
-                      <div className="text-sm">
-                        Gross {currentGross} → Net {currentGross - strokes} →{' '}
-                        <span className="font-bold">
-                          {getStablefordPoints(currentGross, activeHole - 1, player.handicap)} pts
-                        </span>
-                      </div>
-                    )}
+                          <div className={`flex-1 text-center border-2 rounded-xl py-2 ${currentGross ? scoreColor : 'bg-gray-50 border-dashed border-gray-300'}`}>
+                            <div className="text-3xl font-bold">{currentGross || '—'}</div>
+                            <div className={`text-xs font-semibold ${currentGross ? labelColor : 'text-gray-400'}`}>
+                              {currentGross ? `${label} · ${pts} pts` : `Tap +/− (Par ${par})`}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const newScore = Math.min(12, displayScore + 1);
+                              saveScore(player.id, activeHole, newScore);
+                            }}
+                            disabled={saving || displayScore >= 12}
+                            className="w-14 h-14 rounded-xl bg-red-100 text-red-700 text-2xl font-bold hover:bg-red-200 active:bg-red-300 transition-colors disabled:opacity-30"
+                          >
+                            +
+                          </button>
+                          {currentGross && (
+                            <button
+                              onClick={() => clearScore(player.id, activeHole)}
+                              className="w-10 h-10 rounded-lg text-xs text-red-500 border border-red-200 hover:bg-red-50"
+                            >
+                              X
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
