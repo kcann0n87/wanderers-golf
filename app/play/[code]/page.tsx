@@ -194,7 +194,7 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
             {teams.map(t => t.name).join(' + ')}
           </p>
         </div>
-        <Link href="/leaderboard" className="text-emerald-700 text-sm hover:underline">
+        <Link href="/leaderboard" className="px-4 py-2 bg-emerald-700 text-white text-sm font-medium rounded-lg hover:bg-emerald-800 transition-colors">
           Leaderboard
         </Link>
       </div>
