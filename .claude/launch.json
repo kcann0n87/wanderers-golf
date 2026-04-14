@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "wanderers-golf",
+      "runtimeExecutable": "/Users/kylec/local/node/bin/npx",
+      "runtimeArgs": ["next", "dev", "-p", "3003"],
+      "port": 3003,
+      "cwd": "/Users/kylec/Downloads/wanderers-golf"
+    }
+  ]
+}
