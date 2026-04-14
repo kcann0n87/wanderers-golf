@@ -13,6 +13,7 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
   const [showIndividual, setShowIndividual] = useState(false);
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
+  const [scoringUrl, setScoringUrl] = useState<string | null>(null);
 
   async function fetchData() {
     const [tRes, pRes, sRes] = await Promise.all([
@@ -27,6 +28,7 @@ export default function LeaderboardPage() {
   }
 
   useEffect(() => {
+    setScoringUrl(sessionStorage.getItem('scoringUrl'));
     fetchData();
 
     const channel = supabase
@@ -71,6 +73,15 @@ export default function LeaderboardPage() {
 
   return (
     <div className="space-y-4">
+      {scoringUrl && (
+        <button
+          onClick={() => window.location.href = scoringUrl}
+          className="w-full py-3 bg-emerald-700 text-white font-semibold rounded-lg hover:bg-emerald-800 transition-colors"
+        >
+          Back to Scoring
+        </button>
+      )}
+
       {/* Payouts */}
       <div className="bg-white rounded-lg shadow p-4 flex justify-center gap-8 text-center">
         <div>
