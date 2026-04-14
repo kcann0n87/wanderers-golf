@@ -1,65 +1,44 @@
-// Wanderers Golf Club - Course Data
+// Wanderers Golf Club - Course Data (from physical scorecard)
 
-export const PARS = [4, 5, 3, 4, 4, 5, 3, 4, 4, 4, 4, 5, 3, 4, 4, 3, 5, 4];
-export const STROKE_INDEX = [13, 5, 17, 11, 7, 9, 15, 3, 1, 12, 2, 8, 16, 14, 10, 18, 6, 4];
+export const PARS = [4, 5, 3, 4, 3, 4, 5, 4, 4, 4, 3, 5, 4, 4, 3, 4, 5, 4];
+export const STROKE_INDEX = [7, 3, 11, 5, 13, 1, 9, 17, 15, 10, 12, 6, 18, 8, 16, 2, 14, 4];
 export const TOTAL_PAR = 72;
 
-// Tee data from scorecard (Men's tees)
+// Tee data from scorecard
 export const TEES_DATA = [
   {
     name: 'Black',
     slope: 144,
     rating: 75.1,
-    total_yards: 3588,
-    hole_yards: [355, 555, 211, 361, 409, 517, 221, 474, 485, 438, 402, 432, 555, 243, 404, 394, 138, 563, 406],
-  },
-  {
-    name: 'Black/Blue',
-    slope: 141,
-    rating: 73.7,
-    total_yards: 3377,
-    hole_yards: [355, 555, 173, 361, 409, 475, 191, 393, 465, 402, 385, 555, 197, 404, 394, 141, 563, 406],
+    total_yards: 7052,
+    hole_yards: [416, 579, 225, 453, 169, 449, 552, 330, 363, 392, 222, 566, 362, 406, 219, 421, 501, 427],
   },
   {
     name: 'Blue',
     slope: 139,
     rating: 72.4,
-    total_yards: 3298,
-    hole_yards: [342, 518, 173, 355, 386, 475, 191, 393, 465, 366, 385, 517, 197, 374, 350, 141, 530, 380],
-  },
-  {
-    name: 'Blue/White',
-    slope: 133,
-    rating: 71.2,
-    total_yards: 3186,
-    hole_yards: [342, 490, 173, 355, 363, 475, 163, 393, 432, 366, 348, 484, 154, 374, 350, 141, 530, 344],
-  },
-  {
-    name: 'White',
-    slope: 126,
-    rating: 69.7,
-    total_yards: 3035,
-    hole_yards: [312, 490, 140, 347, 363, 433, 163, 355, 432, 330, 348, 484, 154, 342, 322, 116, 465, 344],
-  },
-  {
-    name: 'White/Green',
-    slope: 125,
-    rating: 68.0,
-    total_yards: 2855,
-    hole_yards: [312, 453, 140, 347, 334, 399, 163, 315, 392, 330, 309, 460, 154, 342, 322, 116, 425, 312],
+    total_yards: 6585,
+    hole_yards: [402, 548, 201, 421, 148, 404, 513, 307, 340, 361, 203, 545, 337, 383, 192, 398, 482, 400],
   },
   {
     name: 'Green',
-    slope: 116,
-    rating: 65.6,
-    total_yards: 2641,
-    hole_yards: [284, 453, 105, 250, 334, 399, 109, 315, 392, 288, 309, 460, 89, 275, 287, 72, 425, 312],
+    slope: 130,
+    rating: 70.0,
+    total_yards: 6129,
+    hole_yards: [387, 526, 167, 395, 138, 382, 482, 294, 305, 349, 188, 485, 300, 369, 168, 385, 445, 364],
   },
   {
-    name: 'Orange',
+    name: 'Gold',
+    slope: 125,
+    rating: 68.0,
+    total_yards: 5517,
+    hole_yards: [310, 452, 151, 365, 120, 367, 409, 268, 274, 332, 168, 462, 264, 341, 146, 350, 388, 350],
+  },
+  {
+    name: 'Silver',
     slope: 116,
     rating: 65.6,
-    total_yards: 2198,
-    hole_yards: [232, 372, 105, 215, 266, 355, 109, 266, 278, 227, 228, 379, 89, 213, 215, 72, 362, 243],
+    total_yards: 4739,
+    hole_yards: [279, 408, 135, 317, 82, 318, 380, 227, 245, 284, 129, 383, 230, 273, 100, 283, 353, 313],
   },
 ];
