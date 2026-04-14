@@ -7,9 +7,13 @@ import { PARS, STROKE_INDEX } from '@/lib/course';
 import { getStrokesOnHole, getStablefordPoints } from '@/lib/stableford';
 import Link from 'next/link';
 
+interface TeamWithPlayers extends Team {
+  foursome: number | null;
+}
+
 export default function PlayPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params);
-  const [team, setTeam] = useState<Team | null>(null);
+  const [teams, setTeams] = useState<TeamWithPlayers[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [scores, setScores] = useState<Score[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -32,24 +36,48 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
       return;
     }
 
-    setTeam(teamData as Team);
+    // Find all teams in same foursome
+    let foursomeTeams: TeamWithPlayers[] = [teamData as TeamWithPlayers];
+    if (teamData.foursome) {
+      const { data: pairedTeams } = await supabase
+        .from('teams')
+        .select('*')
+        .eq('foursome', teamData.foursome)
+        .order('name');
+      if (pairedTeams) foursomeTeams = pairedTeams as TeamWithPlayers[];
+    }
 
-    const [pRes, sRes, settRes] = await Promise.all([
-      supabase.from('players').select('*, tee:tees(*)').eq('team_id', teamData.id).order('name'),
-      supabase.from('scores').select('*').in(
-        'player_id',
-        (await supabase.from('players').select('id').eq('team_id', teamData.id)).data?.map((p: { id: string }) => p.id) || []
-      ),
+    setTeams(foursomeTeams);
+
+    const teamIds = foursomeTeams.map(t => t.id);
+
+    const [pRes, settRes] = await Promise.all([
+      supabase.from('players').select('*, tee:tees(*)').in('team_id', teamIds).order('name'),
       supabase.from('settings').select('*').single(),
     ]);
 
-    if (pRes.data) setPlayers(pRes.data as unknown as Player[]);
-    if (sRes.data) setScores(sRes.data as Score[]);
+    const allPlayers = (pRes.data || []) as unknown as Player[];
+    setPlayers(allPlayers);
+
+    // Fetch scores for all players in the foursome
+    const playerIds = allPlayers.map(p => p.id);
+    if (playerIds.length > 0) {
+      const { data: scoreData } = await supabase
+        .from('scores')
+        .select('*')
+        .in('player_id', playerIds);
+      if (scoreData) setScores(scoreData as Score[]);
+    }
+
     if (settRes.data) setSettings(settRes.data as Settings);
 
-    // Set active hole to the first hole without scores
-    if (pRes.data && sRes.data) {
-      const scoredHoles = new Set(sRes.data.map((s: Score) => s.hole));
+    // Set active hole to the first hole without all scores
+    if (allPlayers.length > 0) {
+      const { data: scoreData } = await supabase
+        .from('scores')
+        .select('*')
+        .in('player_id', playerIds);
+      const scoredHoles = new Set((scoreData || []).map((s: Score) => s.hole));
       for (let h = 1; h <= 18; h++) {
         if (!scoredHoles.has(h)) {
           setActiveHole(h);
@@ -141,12 +169,14 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
 
   return (
     <div className="space-y-4">
-      {/* Team header */}
+      {/* Foursome header */}
       <div className="bg-white rounded-lg shadow p-4 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold">{team?.name}</h1>
+          <h1 className="text-xl font-bold">
+            {teams.length > 1 ? `Foursome ${teams[0]?.foursome}` : teams[0]?.name}
+          </h1>
           <p className="text-sm text-gray-500">
-            {players.map(p => `${p.name} (${p.handicap})`).join(' & ')}
+            {teams.map(t => t.name).join(' + ')}
           </p>
         </div>
         <Link href="/leaderboard" className="text-emerald-700 text-sm hover:underline">
@@ -178,7 +208,7 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
         </div>
       </div>
 
-      {/* Active hole scoring */}
+      {/* Active hole scoring — grouped by team */}
       <div className="bg-white rounded-lg shadow p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold">Hole {activeHole}</h2>
@@ -188,73 +218,83 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
           </div>
         </div>
 
-        {players.map(player => {
-          const existing = getScoreForHole(player.id, activeHole);
-          const strokes = getStrokesOnHole(player.handicap, activeHole - 1);
-          const currentGross = existing?.gross_score;
-
+        {teams.map(team => {
+          const teamPlayers = players.filter(p => p.team_id === team.id);
           return (
-            <div key={player.id} className="border rounded-lg p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="font-medium">{player.name}</span>
-                  <span className="text-xs text-gray-400 ml-2">Hcp {player.handicap}</span>
-                  {strokes > 0 && (
-                    <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
-                      +{strokes} stroke{strokes > 1 ? 's' : ''}
-                    </span>
-                  )}
-                </div>
-                <div className="text-sm text-gray-500">
-                  Total: <span className="font-bold text-emerald-700">{getPlayerTotal(player.id)}</span> pts
-                  <span className="ml-1 text-xs">({getPlayerThru(player.id)} holes)</span>
-                </div>
+            <div key={team.id} className="space-y-2">
+              <div className="text-xs font-semibold text-emerald-700 uppercase tracking-wide border-b pb-1">
+                {team.name}
               </div>
+              {teamPlayers.map(player => {
+                const existing = getScoreForHole(player.id, activeHole);
+                const strokes = getStrokesOnHole(player.handicap, activeHole - 1);
+                const currentGross = existing?.gross_score;
 
-              {/* Score buttons */}
-              <div className="flex gap-1.5 flex-wrap">
-                {Array.from({ length: 10 }, (_, i) => i + 1).map(score => {
-                  const pts = getStablefordPoints(score, activeHole - 1, player.handicap);
-                  const isSelected = currentGross === score;
-                  let bgColor = 'bg-gray-100 hover:bg-gray-200';
-                  if (isSelected) {
-                    if (pts === 0) bgColor = 'bg-red-500 text-white';
-                    else if (pts === 1) bgColor = 'bg-orange-400 text-white';
-                    else if (pts === 2) bgColor = 'bg-gray-600 text-white';
-                    else if (pts === 3) bgColor = 'bg-blue-500 text-white';
-                    else bgColor = 'bg-purple-600 text-white';
-                  }
+                return (
+                  <div key={player.id} className="border rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-medium">{player.name}</span>
+                        <span className="text-xs text-gray-400 ml-2">Hcp {player.handicap}</span>
+                        {strokes > 0 && (
+                          <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                            +{strokes} stroke{strokes > 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        <span className="font-bold text-emerald-700">{getPlayerTotal(player.id)}</span> pts
+                        <span className="ml-1 text-xs">({getPlayerThru(player.id)})</span>
+                      </div>
+                    </div>
 
-                  return (
-                    <button
-                      key={score}
-                      onClick={() => saveScore(player.id, activeHole, score)}
-                      disabled={saving}
-                      className={`w-10 h-10 rounded-lg font-bold text-sm transition-colors ${bgColor} disabled:opacity-50`}
-                    >
-                      {score}
-                    </button>
-                  );
-                })}
-                {currentGross && (
-                  <button
-                    onClick={() => clearScore(player.id, activeHole)}
-                    className="w-10 h-10 rounded-lg text-xs text-red-500 border border-red-200 hover:bg-red-50"
-                  >
-                    X
-                  </button>
-                )}
-              </div>
+                    {/* Score buttons */}
+                    <div className="flex gap-1.5 flex-wrap">
+                      {Array.from({ length: 10 }, (_, i) => i + 1).map(score => {
+                        const pts = getStablefordPoints(score, activeHole - 1, player.handicap);
+                        const isSelected = currentGross === score;
+                        let bgColor = 'bg-gray-100 hover:bg-gray-200';
+                        if (isSelected) {
+                          if (pts === 0) bgColor = 'bg-red-500 text-white';
+                          else if (pts === 1) bgColor = 'bg-orange-400 text-white';
+                          else if (pts === 2) bgColor = 'bg-gray-600 text-white';
+                          else if (pts === 3) bgColor = 'bg-blue-500 text-white';
+                          else bgColor = 'bg-purple-600 text-white';
+                        }
 
-              {/* Points feedback */}
-              {currentGross && (
-                <div className="text-sm">
-                  Gross {currentGross} → Net {currentGross - strokes} →{' '}
-                  <span className="font-bold">
-                    {getStablefordPoints(currentGross, activeHole - 1, player.handicap)} pts
-                  </span>
-                </div>
-              )}
+                        return (
+                          <button
+                            key={score}
+                            onClick={() => saveScore(player.id, activeHole, score)}
+                            disabled={saving}
+                            className={`w-10 h-10 rounded-lg font-bold text-sm transition-colors ${bgColor} disabled:opacity-50`}
+                          >
+                            {score}
+                          </button>
+                        );
+                      })}
+                      {currentGross && (
+                        <button
+                          onClick={() => clearScore(player.id, activeHole)}
+                          className="w-10 h-10 rounded-lg text-xs text-red-500 border border-red-200 hover:bg-red-50"
+                        >
+                          X
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Points feedback */}
+                    {currentGross && (
+                      <div className="text-sm">
+                        Gross {currentGross} → Net {currentGross - strokes} →{' '}
+                        <span className="font-bold">
+                          {getStablefordPoints(currentGross, activeHole - 1, player.handicap)} pts
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           );
         })}
@@ -278,50 +318,55 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
         </div>
       </div>
 
-      {/* Scorecard summary */}
-      <div className="bg-white rounded-lg shadow p-4 overflow-x-auto">
-        <h3 className="font-semibold mb-2">Scorecard</h3>
-        <table className="w-full text-xs text-center">
-          <thead>
-            <tr className="border-b">
-              <th className="py-1 text-left pr-2">Hole</th>
-              {Array.from({ length: 18 }, (_, i) => (
-                <th key={i} className="py-1 w-7">{i + 1}</th>
-              ))}
-              <th className="py-1 pl-2 font-bold">Tot</th>
-            </tr>
-            <tr className="border-b text-gray-400">
-              <td className="py-1 text-left pr-2">Par</td>
-              {PARS.map((p, i) => <td key={i} className="py-1">{p}</td>)}
-              <td className="py-1 pl-2">{PARS.reduce((a, b) => a + b, 0)}</td>
-            </tr>
-          </thead>
-          <tbody>
-            {players.map(player => (
-              <tr key={player.id} className="border-b last:border-0">
-                <td className="py-1 text-left pr-2 font-medium truncate max-w-[80px]">{player.name}</td>
-                {Array.from({ length: 18 }, (_, i) => {
-                  const s = getScoreForHole(player.id, i + 1);
-                  const pts = s ? getStablefordPoints(s.gross_score, i, player.handicap) : null;
-                  let color = '';
-                  if (pts !== null) {
-                    if (pts === 0) color = 'text-red-500';
-                    else if (pts === 1) color = 'text-orange-500';
-                    else if (pts === 2) color = '';
-                    else if (pts >= 3) color = 'text-blue-600 font-bold';
-                  }
-                  return (
-                    <td key={i} className={`py-1 ${color}`}>
-                      {s ? s.gross_score : '—'}
-                    </td>
-                  );
-                })}
-                <td className="py-1 pl-2 font-bold text-emerald-700">{getPlayerTotal(player.id)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* Scorecard summary — grouped by team */}
+      {teams.map(team => {
+        const teamPlayers = players.filter(p => p.team_id === team.id);
+        return (
+          <div key={team.id} className="bg-white rounded-lg shadow p-4 overflow-x-auto">
+            <h3 className="font-semibold mb-2">{team.name}</h3>
+            <table className="w-full text-xs text-center">
+              <thead>
+                <tr className="border-b">
+                  <th className="py-1 text-left pr-2">Hole</th>
+                  {Array.from({ length: 18 }, (_, i) => (
+                    <th key={i} className="py-1 w-7">{i + 1}</th>
+                  ))}
+                  <th className="py-1 pl-2 font-bold">Tot</th>
+                </tr>
+                <tr className="border-b text-gray-400">
+                  <td className="py-1 text-left pr-2">Par</td>
+                  {PARS.map((p, i) => <td key={i} className="py-1">{p}</td>)}
+                  <td className="py-1 pl-2">72</td>
+                </tr>
+              </thead>
+              <tbody>
+                {teamPlayers.map(player => (
+                  <tr key={player.id} className="border-b last:border-0">
+                    <td className="py-1 text-left pr-2 font-medium truncate max-w-[80px]">{player.name}</td>
+                    {Array.from({ length: 18 }, (_, i) => {
+                      const s = getScoreForHole(player.id, i + 1);
+                      const pts = s ? getStablefordPoints(s.gross_score, i, player.handicap) : null;
+                      let color = '';
+                      if (pts !== null) {
+                        if (pts === 0) color = 'text-red-500';
+                        else if (pts === 1) color = 'text-orange-500';
+                        else if (pts === 2) color = '';
+                        else if (pts >= 3) color = 'text-blue-600 font-bold';
+                      }
+                      return (
+                        <td key={i} className={`py-1 ${color}`}>
+                          {s ? s.gross_score : '—'}
+                        </td>
+                      );
+                    })}
+                    <td className="py-1 pl-2 font-bold text-emerald-700">{getPlayerTotal(player.id)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
     </div>
   );
 }
