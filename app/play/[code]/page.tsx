@@ -9,6 +9,7 @@ import Link from 'next/link';
 
 interface TeamWithPlayers extends Team {
   foursome: number | null;
+  pin: string | null;
 }
 
 export default function PlayPage({ params }: { params: Promise<{ code: string }> }) {
@@ -21,6 +22,9 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
   const [notFound, setNotFound] = useState(false);
   const [activeHole, setActiveHole] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [pinUnlocked, setPinUnlocked] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
 
   async function fetchData() {
     // Find team by code
@@ -160,6 +164,49 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
       <div className="text-center py-12 space-y-4">
         <h2 className="text-xl font-bold text-gray-600">Scoring is closed</h2>
         <Link href="/leaderboard" className="text-emerald-700 hover:underline">View Leaderboard</Link>
+      </div>
+    );
+  }
+
+  // PIN gate
+  const teamPin = teams[0]?.pin;
+  if (teamPin && !pinUnlocked) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-6">
+        <div className="text-center">
+          <h2 className="text-xl font-bold">{teams.map(t => t.name).join(' + ')}</h2>
+          <p className="text-gray-500 text-sm mt-1">Enter your 4-digit PIN to access scoring</p>
+        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (pinInput === teamPin) {
+              setPinUnlocked(true);
+              setPinError('');
+            } else {
+              setPinError('Wrong PIN');
+            }
+          }}
+          className="w-full max-w-xs space-y-3"
+        >
+          <input
+            type="tel"
+            inputMode="numeric"
+            value={pinInput}
+            onChange={(e) => { setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4)); setPinError(''); }}
+            placeholder="0000"
+            className="w-full px-4 py-3 text-center text-3xl font-mono tracking-[0.5em] border-2 border-gray-300 rounded-lg focus:border-emerald-600 focus:outline-none"
+            maxLength={4}
+            autoFocus
+          />
+          {pinError && <p className="text-red-600 text-sm text-center">{pinError}</p>}
+          <button
+            type="submit"
+            className="w-full py-3 bg-emerald-700 text-white font-semibold rounded-lg hover:bg-emerald-800"
+          >
+            Unlock
+          </button>
+        </form>
       </div>
     );
   }
