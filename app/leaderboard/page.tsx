@@ -71,6 +71,22 @@ export default function LeaderboardPage() {
 
   return (
     <div className="space-y-4">
+      {/* Payouts */}
+      <div className="bg-white rounded-lg shadow p-4 flex justify-center gap-8 text-center">
+        <div>
+          <div className="text-xs text-gray-400 uppercase">1st</div>
+          <div className="text-xl font-bold text-yellow-600">$2,400</div>
+        </div>
+        <div>
+          <div className="text-xs text-gray-400 uppercase">2nd</div>
+          <div className="text-xl font-bold text-gray-500">$1,000</div>
+        </div>
+        <div>
+          <div className="text-xs text-gray-400 uppercase">3rd</div>
+          <div className="text-xl font-bold text-amber-700">$600</div>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Live Leaderboard</h1>
         <div className="flex bg-gray-200 rounded-lg p-0.5">
