@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, useRef, use } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Player, Team, Score, Settings } from '@/lib/types';
@@ -25,7 +25,7 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
   const [notFound, setNotFound] = useState(false);
   const [activeHole, setActiveHole] = useState(1);
   const [saving, setSaving] = useState(false);
-  const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const initialLoadDone = useRef(false);
 
   async function fetchData() {
     // Find team by code
@@ -77,7 +77,7 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
     if (settRes.data) setSettings(settRes.data as Settings);
 
     // Only auto-set active hole on first load
-    if (!initialLoadDone && allPlayers.length > 0) {
+    if (!initialLoadDone.current && allPlayers.length > 0) {
       const { data: scoreData } = await supabase
         .from('scores')
         .select('*')
@@ -89,7 +89,7 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
           break;
         }
       }
-      setInitialLoadDone(true);
+      initialLoadDone.current = true;
     }
 
     setLoading(false);
