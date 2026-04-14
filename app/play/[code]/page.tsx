@@ -25,6 +25,7 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
   const [notFound, setNotFound] = useState(false);
   const [activeHole, setActiveHole] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   async function fetchData() {
     // Find team by code
@@ -75,8 +76,8 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
 
     if (settRes.data) setSettings(settRes.data as Settings);
 
-    // Set active hole to the first hole without all scores
-    if (allPlayers.length > 0) {
+    // Only auto-set active hole on first load
+    if (!initialLoadDone && allPlayers.length > 0) {
       const { data: scoreData } = await supabase
         .from('scores')
         .select('*')
@@ -88,6 +89,7 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
           break;
         }
       }
+      setInitialLoadDone(true);
     }
 
     setLoading(false);
@@ -282,10 +284,10 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
                         <div className="flex items-center gap-3">
                           <button
                             onClick={() => {
-                              const newScore = Math.max(1, displayScore - 1);
-                              saveScore(player.id, activeHole, newScore);
+                              const newScore = currentGross ? Math.max(1, currentGross - 1) : par - 1;
+                              if (newScore >= 1) saveScore(player.id, activeHole, newScore);
                             }}
-                            disabled={saving || displayScore <= 1}
+                            disabled={saving}
                             className="w-14 h-14 rounded-xl bg-blue-100 text-blue-700 text-2xl font-bold hover:bg-blue-200 active:bg-blue-300 transition-colors disabled:opacity-30"
                           >
                             −
@@ -293,15 +295,15 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
                           <div className={`flex-1 text-center border-2 rounded-xl py-2 ${currentGross ? scoreColor : 'bg-gray-50 border-dashed border-gray-300'}`}>
                             <div className="text-3xl font-bold">{currentGross || '—'}</div>
                             <div className={`text-xs font-semibold ${currentGross ? labelColor : 'text-gray-400'}`}>
-                              {currentGross ? `${label} · ${pts} pts` : `Tap +/− (Par ${par})`}
+                              {currentGross ? `${label} · ${pts} pts` : `Tap + for Par, − for Birdie`}
                             </div>
                           </div>
                           <button
                             onClick={() => {
-                              const newScore = Math.min(12, displayScore + 1);
+                              const newScore = currentGross ? Math.min(12, currentGross + 1) : par;
                               saveScore(player.id, activeHole, newScore);
                             }}
-                            disabled={saving || displayScore >= 12}
+                            disabled={saving}
                             className="w-14 h-14 rounded-xl bg-red-100 text-red-700 text-2xl font-bold hover:bg-red-200 active:bg-red-300 transition-colors disabled:opacity-30"
                           >
                             +
