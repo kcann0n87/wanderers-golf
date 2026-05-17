@@ -2,91 +2,74 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Player, Team, Tee, Settings } from '@/lib/types';
+import { Player, RyderMatch, Settings } from '@/lib/types';
 import AdminGate from '@/components/AdminGate';
 
-function generateCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 5; i++) code += chars[Math.floor(Math.random() * chars.length)];
-  return code;
+function generatePin(): string {
+  return String(Math.floor(1000 + Math.random() * 9000));
 }
 
 function AdminDashboard() {
   const [players, setPlayers] = useState<Player[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [tees, setTees] = useState<Tee[]>([]);
+  const [matches, setMatches] = useState<RyderMatch[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [editingPlayer, setEditingPlayer] = useState<string | null>(null);
+  const [editCHS, setEditCHS] = useState('');
+  const [editCHR, setEditCHR] = useState('');
 
-  // New player form
-  const [newName, setNewName] = useState('');
-  const [newHandicap, setNewHandicap] = useState('18');
-  const [newTeeId, setNewTeeId] = useState('');
-
-  // New team form
-  const [teamName, setTeamName] = useState('');
-  const [teamP1, setTeamP1] = useState('');
-  const [teamP2, setTeamP2] = useState('');
+  // Match creation form
+  const [matchRound, setMatchRound] = useState(1);
+  const [t1p1, setT1p1] = useState('');
+  const [t1p2, setT1p2] = useState('');
+  const [t2p1, setT2p1] = useState('');
+  const [t2p2, setT2p2] = useState('');
 
   async function fetchAll() {
-    const [pRes, tRes, teeRes, sRes] = await Promise.all([
-      supabase.from('players').select('*, tee:tees(*)').order('name'),
-      supabase.from('teams').select('*, players(*)').order('name'),
-      supabase.from('tees').select('*').order('total_yards', { ascending: false }),
+    const [pRes, mRes, sRes] = await Promise.all([
+      supabase.from('players').select('*').not('ryder_team', 'is', null).order('ryder_team').order('name'),
+      supabase.from('ryder_matches').select('*, team1_player1:players!ryder_matches_team1_player1_id_fkey(*), team1_player2:players!ryder_matches_team1_player2_id_fkey(*), team2_player1:players!ryder_matches_team2_player1_id_fkey(*), team2_player2:players!ryder_matches_team2_player2_id_fkey(*)').order('round').order('match_number'),
       supabase.from('settings').select('*').single(),
     ]);
     if (pRes.data) setPlayers(pRes.data as unknown as Player[]);
-    if (tRes.data) setTeams(tRes.data as unknown as Team[]);
-    if (teeRes.data) {
-      setTees(teeRes.data as Tee[]);
-      if (!newTeeId && teeRes.data.length > 0) {
-        const white = teeRes.data.find((t: Tee) => t.name === 'White');
-        setNewTeeId(white?.id || teeRes.data[0].id);
-      }
-    }
+    if (mRes.data) setMatches(mRes.data as unknown as RyderMatch[]);
     if (sRes.data) setSettings(sRes.data as Settings);
   }
 
   useEffect(() => { fetchAll(); }, []);
 
-  async function addPlayer(e: React.FormEvent) {
+  const jordanPlayers = players.filter(p => p.ryder_team === 'jordan');
+  const nolanPlayers = players.filter(p => p.ryder_team === 'nolan');
+
+  async function updateHandicaps(playerId: string) {
+    await supabase.from('players').update({
+      course_handicap_straits: parseInt(editCHS) || 0,
+      course_handicap_river: parseInt(editCHR) || 0,
+    }).eq('id', playerId);
+    setEditingPlayer(null);
+    fetchAll();
+  }
+
+  async function createMatch(e: React.FormEvent) {
     e.preventDefault();
-    if (!newName.trim()) return;
-    await supabase.from('players').insert({
-      name: newName.trim(),
-      handicap: parseInt(newHandicap) || 18,
-      tee_id: newTeeId || null,
+    if (!t1p1 || !t1p2 || !t2p1 || !t2p2) return;
+    const existingMatches = matches.filter(m => m.round === matchRound);
+    const matchNum = existingMatches.length + 1;
+    await supabase.from('ryder_matches').insert({
+      round: matchRound,
+      match_number: matchNum,
+      team1_player1_id: t1p1,
+      team1_player2_id: t1p2,
+      team2_player1_id: t2p1,
+      team2_player2_id: t2p2,
+      pin: generatePin(),
     });
-    setNewName('');
-    setNewHandicap('18');
+    setT1p1(''); setT1p2(''); setT2p1(''); setT2p2('');
     fetchAll();
   }
 
-  async function deletePlayer(id: string) {
-    await supabase.from('players').delete().eq('id', id);
-    fetchAll();
-  }
-
-  async function createTeam(e: React.FormEvent) {
-    e.preventDefault();
-    if (!teamName.trim() || !teamP1 || !teamP2) return;
-    const code = generateCode();
-    const { data } = await supabase.from('teams').insert({
-      name: teamName.trim(),
-      group_code: code,
-    }).select().single();
-    if (data) {
-      await supabase.from('players').update({ team_id: data.id }).in('id', [teamP1, teamP2]);
-    }
-    setTeamName('');
-    setTeamP1('');
-    setTeamP2('');
-    fetchAll();
-  }
-
-  async function deleteTeam(id: string) {
-    await supabase.from('players').update({ team_id: null }).eq('team_id', id);
-    await supabase.from('teams').delete().eq('id', id);
+  async function deleteMatch(id: string) {
+    await supabase.from('scores').delete().eq('match_id', id);
+    await supabase.from('ryder_matches').delete().eq('id', id);
     fetchAll();
   }
 
@@ -96,174 +79,170 @@ function AdminDashboard() {
     fetchAll();
   }
 
-  const unassignedPlayers = players.filter(p => !p.team_id);
+  async function setActiveRound(round: number) {
+    await supabase.from('settings').update({ active_round: round }).eq('id', 1);
+    fetchAll();
+  }
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-        <button
-          onClick={toggleScoring}
-          className={`px-4 py-2 rounded-lg font-medium text-white ${
-            settings?.scoring_open ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'
-          }`}
-        >
-          {settings?.scoring_open ? 'Close Scoring' : 'Open Scoring'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveRound(1)}
+            className={`px-3 py-2 rounded-lg text-sm font-medium ${settings?.active_round === 1 ? 'bg-blue-900 text-white' : 'bg-gray-200'}`}
+          >
+            R1: Straits
+          </button>
+          <button
+            onClick={() => setActiveRound(2)}
+            className={`px-3 py-2 rounded-lg text-sm font-medium ${settings?.active_round === 2 ? 'bg-blue-900 text-white' : 'bg-gray-200'}`}
+          >
+            R2: River
+          </button>
+          <button
+            onClick={toggleScoring}
+            className={`px-4 py-2 rounded-lg font-medium text-white ${settings?.scoring_open ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}
+          >
+            {settings?.scoring_open ? 'Close Scoring' : 'Open Scoring'}
+          </button>
+        </div>
       </div>
 
-      {/* Add Player */}
-      <section className="bg-white rounded-lg shadow p-4">
-        <h2 className="text-lg font-semibold mb-3">Add Player</h2>
-        <form onSubmit={addPlayer} className="flex flex-wrap gap-2 items-end">
-          <div className="flex-1 min-w-[150px]">
-            <label className="block text-xs text-gray-500 mb-1">Name</label>
-            <input
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:border-emerald-600 focus:outline-none"
-              placeholder="Player name"
-            />
-          </div>
-          <div className="w-20">
-            <label className="block text-xs text-gray-500 mb-1">Handicap</label>
-            <input
-              type="number"
-              value={newHandicap}
-              onChange={(e) => setNewHandicap(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:border-emerald-600 focus:outline-none"
-              min={0}
-              max={54}
-            />
-          </div>
-          <div className="w-36">
-            <label className="block text-xs text-gray-500 mb-1">Tee</label>
-            <select
-              value={newTeeId}
-              onChange={(e) => setNewTeeId(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:border-emerald-600 focus:outline-none"
-            >
-              {tees.map(t => (
-                <option key={t.id} value={t.id}>{t.name} ({t.total_yards}m)</option>
-              ))}
-            </select>
-          </div>
-          <button type="submit" className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800">
-            Add
-          </button>
-        </form>
-      </section>
-
-      {/* Players List */}
-      <section className="bg-white rounded-lg shadow p-4">
-        <h2 className="text-lg font-semibold mb-3">Players ({players.length})</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-gray-500">
-                <th className="pb-2">Name</th>
-                <th className="pb-2">Hcp</th>
-                <th className="pb-2">Tee</th>
-                <th className="pb-2">Team</th>
-                <th className="pb-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {players.map(p => (
-                <tr key={p.id} className="border-b last:border-0">
-                  <td className="py-2 font-medium">{p.name}</td>
-                  <td className="py-2">{p.handicap}</td>
-                  <td className="py-2">{p.tee?.name || '—'}</td>
-                  <td className="py-2 text-gray-500">
-                    {teams.find(t => t.id === p.team_id)?.name || '—'}
-                  </td>
-                  <td className="py-2">
-                    <button onClick={() => deletePlayer(p.id)} className="text-red-500 hover:text-red-700 text-xs">
-                      Remove
-                    </button>
-                  </td>
+      {/* Players & Handicaps */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {[{ label: 'Team Jordan', color: 'bg-red-700', list: jordanPlayers }, { label: 'Team Nolan', color: 'bg-blue-700', list: nolanPlayers }].map(({ label, color, list }) => (
+          <section key={label} className="bg-white rounded-lg shadow p-4">
+            <h2 className={`text-white text-sm font-bold px-3 py-1.5 rounded ${color} mb-3`}>{label}</h2>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-gray-500">
+                  <th className="pb-1">Name</th>
+                  <th className="pb-1 text-center">Straits CH</th>
+                  <th className="pb-1 text-center">River CH</th>
+                  <th className="pb-1"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              </thead>
+              <tbody>
+                {list.map(p => (
+                  <tr key={p.id} className="border-b last:border-0">
+                    <td className="py-1.5 font-medium">{p.name}</td>
+                    {editingPlayer === p.id ? (
+                      <>
+                        <td className="py-1.5 text-center">
+                          <input type="number" value={editCHS} onChange={e => setEditCHS(e.target.value)}
+                            className="w-14 px-1 py-0.5 border rounded text-center text-sm" />
+                        </td>
+                        <td className="py-1.5 text-center">
+                          <input type="number" value={editCHR} onChange={e => setEditCHR(e.target.value)}
+                            className="w-14 px-1 py-0.5 border rounded text-center text-sm" />
+                        </td>
+                        <td className="py-1.5 text-right">
+                          <button onClick={() => updateHandicaps(p.id)} className="text-blue-600 text-xs mr-1">Save</button>
+                          <button onClick={() => setEditingPlayer(null)} className="text-gray-400 text-xs">X</button>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="py-1.5 text-center">{p.course_handicap_straits || 0}</td>
+                        <td className="py-1.5 text-center">{p.course_handicap_river || 0}</td>
+                        <td className="py-1.5 text-right">
+                          <button onClick={() => { setEditingPlayer(p.id); setEditCHS(String(p.course_handicap_straits || 0)); setEditCHR(String(p.course_handicap_river || 0)); }}
+                            className="text-blue-600 text-xs">Edit</button>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        ))}
+      </div>
 
-      {/* Create Team */}
+      {/* Create Match */}
       <section className="bg-white rounded-lg shadow p-4">
-        <h2 className="text-lg font-semibold mb-3">Create Team</h2>
-        <form onSubmit={createTeam} className="flex flex-wrap gap-2 items-end">
-          <div className="flex-1 min-w-[120px]">
-            <label className="block text-xs text-gray-500 mb-1">Team Name</label>
-            <input
-              value={teamName}
-              onChange={(e) => setTeamName(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:border-emerald-600 focus:outline-none"
-              placeholder="e.g. Team 1"
-            />
+        <h2 className="text-lg font-semibold mb-3">Create Match</h2>
+        <form onSubmit={createMatch} className="space-y-3">
+          <div className="flex gap-2 items-end flex-wrap">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Round</label>
+              <select value={matchRound} onChange={e => setMatchRound(Number(e.target.value))}
+                className="px-3 py-2 border rounded-lg">
+                <option value={1}>R1: Straits (Best Ball)</option>
+                <option value={2}>R2: River (High/Low)</option>
+              </select>
+            </div>
           </div>
-          <div className="w-40">
-            <label className="block text-xs text-gray-500 mb-1">Player 1</label>
-            <select
-              value={teamP1}
-              onChange={(e) => setTeamP1(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:border-emerald-600 focus:outline-none"
-            >
-              <option value="">Select...</option>
-              {unassignedPlayers.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <div className="text-xs font-bold text-red-700 uppercase">Team Jordan Side</div>
+              <select value={t1p1} onChange={e => setT1p1(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg">
+                <option value="">Player 1...</option>
+                {jordanPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <select value={t1p2} onChange={e => setT1p2(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg">
+                <option value="">Player 2...</option>
+                {jordanPlayers.filter(p => p.id !== t1p1).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <div className="text-xs font-bold text-blue-700 uppercase">Team Nolan Side</div>
+              <select value={t2p1} onChange={e => setT2p1(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg">
+                <option value="">Player 1...</option>
+                {nolanPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <select value={t2p2} onChange={e => setT2p2(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg">
+                <option value="">Player 2...</option>
+                {nolanPlayers.filter(p => p.id !== t2p1).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
           </div>
-          <div className="w-40">
-            <label className="block text-xs text-gray-500 mb-1">Player 2</label>
-            <select
-              value={teamP2}
-              onChange={(e) => setTeamP2(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:border-emerald-600 focus:outline-none"
-            >
-              <option value="">Select...</option>
-              {unassignedPlayers.filter(p => p.id !== teamP1).map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </div>
-          <button type="submit" className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800">
-            Create
+          <button type="submit" className="px-6 py-2 bg-blue-900 text-white rounded-lg hover:bg-blue-950">
+            Create Match
           </button>
         </form>
       </section>
 
-      {/* Teams List */}
-      <section className="bg-white rounded-lg shadow p-4">
-        <h2 className="text-lg font-semibold mb-3">Teams ({teams.length})</h2>
-        <div className="space-y-3">
-          {teams.map(t => {
-            const teamPlayers = (t.players || []) as Player[];
-            return (
-              <div key={t.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
-                <div>
-                  <div className="font-semibold">{t.name}</div>
-                  <div className="text-sm text-gray-500">
-                    {teamPlayers.map(p => p.name).join(' & ') || 'No players'}
+      {/* Matches List */}
+      {[1, 2].map(round => {
+        const roundMatches = matches.filter(m => m.round === round);
+        if (roundMatches.length === 0) return null;
+        return (
+          <section key={round} className="bg-white rounded-lg shadow p-4">
+            <h2 className="text-lg font-semibold mb-3">
+              {round === 1 ? 'R1: Straits — Best Ball' : 'R2: River — High/Low'}
+            </h2>
+            <div className="space-y-2">
+              {roundMatches.map(m => (
+                <div key={m.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+                  <div>
+                    <div className="font-medium text-sm">
+                      Match {m.match_number}:{' '}
+                      <span className="text-red-700">{m.team1_player1?.name} & {m.team1_player2?.name}</span>
+                      {' vs '}
+                      <span className="text-blue-700">{m.team2_player1?.name} & {m.team2_player2?.name}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded font-mono font-bold">
+                      PIN: {m.pin}
+                    </div>
+                    <button onClick={() => deleteMatch(m.id)} className="text-red-500 hover:text-red-700 text-xs">
+                      Delete
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded font-mono font-bold tracking-widest">
-                    {t.group_code}
-                  </div>
-                  <button onClick={() => deleteTeam(t.id)} className="text-red-500 hover:text-red-700 text-xs">
-                    Delete
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-          {teams.length === 0 && (
-            <p className="text-gray-400 text-sm">No teams yet. Add players first, then create teams.</p>
-          )}
-        </div>
-      </section>
+              ))}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }

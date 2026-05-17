@@ -20,10 +20,9 @@ export default function Home() {
     setLoading(true);
     setError('');
 
-    // Find a team with this PIN
     const { data } = await supabase
-      .from('teams')
-      .select('group_code')
+      .from('ryder_matches')
+      .select('id')
       .eq('pin', pin)
       .limit(1)
       .single();
@@ -34,20 +33,32 @@ export default function Home() {
       return;
     }
 
-    router.push(`/play/${data.group_code}?pin=${pin}`);
+    router.push(`/play/${data.id}?pin=${pin}`);
   }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-8">
       <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold text-emerald-900">Wanderers Golf Day</h1>
-        <p className="text-gray-600">2-Man Best Ball Stableford</p>
+        <h1 className="text-3xl font-bold text-blue-950">Ryder Cup 2026</h1>
+        <p className="text-gray-600">Team Jordan vs Team Nolan</p>
+      </div>
+
+      <div className="flex gap-6 text-center">
+        <div className="bg-red-700 text-white px-6 py-3 rounded-lg">
+          <div className="text-xs uppercase tracking-wide opacity-80">Team</div>
+          <div className="text-xl font-bold">Jordan</div>
+        </div>
+        <div className="text-2xl font-bold text-gray-400 self-center">vs</div>
+        <div className="bg-blue-700 text-white px-6 py-3 rounded-lg">
+          <div className="text-xs uppercase tracking-wide opacity-80">Team</div>
+          <div className="text-xl font-bold">Nolan</div>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="w-full max-w-xs space-y-4">
         <div>
           <label htmlFor="pin" className="block text-sm font-medium text-gray-700 mb-1">
-            Enter your group PIN
+            Enter your match PIN
           </label>
           <input
             id="pin"
@@ -56,7 +67,7 @@ export default function Home() {
             value={pin}
             onChange={(e) => { setPin(e.target.value.replace(/\D/g, '').slice(0, 4)); setError(''); }}
             placeholder="0000"
-            className="w-full px-4 py-3 text-center text-3xl font-mono tracking-[0.5em] border-2 border-gray-300 rounded-lg focus:border-emerald-600 focus:outline-none"
+            className="w-full px-4 py-3 text-center text-3xl font-mono tracking-[0.5em] border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none"
             maxLength={4}
             autoFocus
           />
@@ -65,16 +76,13 @@ export default function Home() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-3 bg-emerald-700 text-white font-semibold rounded-lg hover:bg-emerald-800 transition-colors disabled:opacity-50"
+          className="w-full py-3 bg-blue-900 text-white font-semibold rounded-lg hover:bg-blue-950 transition-colors disabled:opacity-50"
         >
-          {loading ? 'Checking...' : 'Enter Scores'}
+          {loading ? 'Loading...' : 'Enter Scores'}
         </button>
       </form>
 
-      <Link
-        href="/leaderboard"
-        className="text-emerald-700 font-medium hover:underline"
-      >
+      <Link href="/leaderboard" className="text-blue-800 font-medium hover:underline">
         View Live Leaderboard
       </Link>
     </div>

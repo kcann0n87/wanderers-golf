@@ -2,27 +2,25 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Player, Team, Score, TeamResult } from '@/lib/types';
-import { buildPlayerRound, buildTeamResult, getStablefordPoints } from '@/lib/stableford';
-import { PARS } from '@/lib/course';
+import { Player, RyderMatch, Score } from '@/lib/types';
+import { STRAITS, RIVER } from '@/lib/courses';
+import { calcBestBallMatch, calcHighLowMatch, bestBallPoints, formatMatchStatus } from '@/lib/ryder';
 
 export default function LeaderboardPage() {
-  const [teams, setTeams] = useState<Team[]>([]);
+  const [matches, setMatches] = useState<RyderMatch[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [scores, setScores] = useState<Score[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showIndividual, setShowIndividual] = useState(false);
-  const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
   const [scoringUrl, setScoringUrl] = useState<string | null>(null);
 
   async function fetchData() {
-    const [tRes, pRes, sRes] = await Promise.all([
-      supabase.from('teams').select('*').order('name'),
-      supabase.from('players').select('*, tee:tees(*)').order('name'),
+    const [mRes, pRes, sRes] = await Promise.all([
+      supabase.from('ryder_matches').select('*').order('round').order('match_number'),
+      supabase.from('players').select('*').not('ryder_team', 'is', null),
       supabase.from('scores').select('*'),
     ]);
-    if (tRes.data) setTeams(tRes.data as Team[]);
-    if (pRes.data) setPlayers(pRes.data as unknown as Player[]);
+    if (mRes.data) setMatches(mRes.data as RyderMatch[]);
+    if (pRes.data) setPlayers(pRes.data as Player[]);
     if (sRes.data) setScores(sRes.data as Score[]);
     setLoading(false);
   }
@@ -30,214 +28,162 @@ export default function LeaderboardPage() {
   useEffect(() => {
     setScoringUrl(sessionStorage.getItem('scoringUrl'));
     fetchData();
-
     const channel = supabase
       .channel('leaderboard')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ryder_matches' }, () => fetchData())
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // Build team results
-  const teamResults: TeamResult[] = teams
-    .map(team => {
-      const teamPlayers = players.filter(p => p.team_id === team.id);
-      if (teamPlayers.length < 2) return null;
-      const p1Scores = scores.filter(s => s.player_id === teamPlayers[0].id);
-      const p2Scores = scores.filter(s => s.player_id === teamPlayers[1].id);
-      const p1Round = buildPlayerRound(teamPlayers[0], p1Scores);
-      const p2Round = buildPlayerRound(teamPlayers[1], p2Scores);
-      return buildTeamResult(team, p1Round, p2Round);
-    })
-    .filter((r): r is TeamResult => r !== null)
-    .sort((a, b) => b.bestBallTotal - a.bestBallTotal);
-
-  // Build individual results
-  const individualResults = players
-    .map(player => {
-      const playerScores = scores.filter(s => s.player_id === player.id);
-      return buildPlayerRound(player, playerScores);
-    })
-    .sort((a, b) => b.totalStableford - a.totalStableford);
-
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-700" />
-      </div>
-    );
+    return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900" /></div>;
   }
+
+  const r1Matches = matches.filter(m => m.round === 1);
+  const r2Matches = matches.filter(m => m.round === 2);
+
+  // Calculate R1 totals
+  let r1JordanTotal = 0;
+  let r1NolanTotal = 0;
+  const r1Results = r1Matches.map(m => {
+    const matchScores = scores.filter(s => s.match_id === m.id);
+    const result = calcBestBallMatch(m, matchScores, STRAITS, players);
+    const complete = result.thru === 18;
+    const pts = bestBallPoints(result.status, complete);
+    if (pts) { r1JordanTotal += pts.team1; r1NolanTotal += pts.team2; }
+    return { match: m, result, pts, complete };
+  });
+
+  // Calculate R2 totals
+  let r2JordanTotal = 0;
+  let r2NolanTotal = 0;
+  const r2Results = r2Matches.map(m => {
+    const matchScores = scores.filter(s => s.match_id === m.id);
+    const result = calcHighLowMatch(m, matchScores, RIVER, players);
+    r2JordanTotal += result.team1Points;
+    r2NolanTotal += result.team2Points;
+    return { match: m, result };
+  });
+
+  const totalJordan = r1JordanTotal + r2JordanTotal;
+  const totalNolan = r1NolanTotal + r2NolanTotal;
 
   return (
     <div className="space-y-4">
       {scoringUrl && (
-        <button
-          onClick={() => window.location.href = scoringUrl}
-          className="w-full py-3 bg-emerald-700 text-white font-semibold rounded-lg hover:bg-emerald-800 transition-colors"
-        >
+        <button onClick={() => window.location.href = scoringUrl}
+          className="w-full py-3 bg-blue-900 text-white font-semibold rounded-lg hover:bg-blue-950">
           Back to Scoring
         </button>
       )}
 
-      {/* Payouts */}
-      <div className="bg-white rounded-lg shadow p-4 flex justify-center gap-8 text-center">
-        <div>
-          <div className="text-xs text-gray-400 uppercase">1st</div>
-          <div className="text-xl font-bold text-yellow-600">$2,400</div>
+      {/* Overall Score */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-center text-sm text-gray-500 uppercase tracking-wide mb-4">Tournament Score</h2>
+        <div className="flex items-center justify-center gap-6">
+          <div className="text-center">
+            <div className="text-xs uppercase tracking-wide text-red-700 font-bold">Team Jordan</div>
+            <div className="text-5xl font-bold text-red-700">{totalJordan}</div>
+          </div>
+          <div className="text-3xl font-bold text-gray-300">—</div>
+          <div className="text-center">
+            <div className="text-xs uppercase tracking-wide text-blue-700 font-bold">Team Nolan</div>
+            <div className="text-5xl font-bold text-blue-700">{totalNolan}</div>
+          </div>
         </div>
-        <div>
-          <div className="text-xs text-gray-400 uppercase">2nd</div>
-          <div className="text-xl font-bold text-gray-500">$1,000</div>
-        </div>
-        <div>
-          <div className="text-xs text-gray-400 uppercase">3rd</div>
-          <div className="text-xl font-bold text-amber-700">$600</div>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Live Leaderboard</h1>
-        <div className="flex bg-gray-200 rounded-lg p-0.5">
-          <button
-            onClick={() => setShowIndividual(false)}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              !showIndividual ? 'bg-white shadow text-emerald-800' : 'text-gray-500'
-            }`}
-          >
-            Teams
-          </button>
-          <button
-            onClick={() => setShowIndividual(true)}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              showIndividual ? 'bg-white shadow text-emerald-800' : 'text-gray-500'
-            }`}
-          >
-            Individual
-          </button>
+        <div className="text-center mt-2 text-xs text-gray-400">
+          R1: {r1JordanTotal}–{r1NolanTotal} | R2: {r2JordanTotal}–{r2NolanTotal}
         </div>
       </div>
 
-      {!showIndividual ? (
-        /* Team Leaderboard */
-        <div className="space-y-2">
-          {teamResults.map((result, idx) => (
-            <div key={result.team.id} className="bg-white rounded-lg shadow overflow-hidden">
-              <button
-                onClick={() => setExpandedTeam(expandedTeam === result.team.id ? null : result.team.id)}
-                className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors"
-              >
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                  idx === 0 ? 'bg-yellow-400 text-yellow-900' :
-                  idx === 1 ? 'bg-gray-300 text-gray-700' :
-                  idx === 2 ? 'bg-amber-600 text-amber-100' :
-                  'bg-gray-100 text-gray-500'
-                }`}>
-                  {idx + 1}
-                </div>
-                <div className="flex-1 text-left">
-                  <div className="font-semibold">{result.team.name}</div>
-                  <div className="text-xs text-gray-500">
-                    {result.player1.player.name} & {result.player2.player.name}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-2xl font-bold text-emerald-700">{result.bestBallTotal}</div>
-                  <div className="text-xs text-gray-400">
-                    thru {result.thruHole}
-                  </div>
-                </div>
-              </button>
+      {/* R1: Straits Best Ball */}
+      {r1Results.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-4">
+          <h3 className="font-bold mb-3">R1: The Straits — Best Ball (10/5/0)</h3>
+          <div className="space-y-2">
+            {r1Results.map(({ match: m, result, pts, complete }) => {
+              const p1 = players.find(p => p.id === m.team1_player1_id);
+              const p2 = players.find(p => p.id === m.team1_player2_id);
+              const p3 = players.find(p => p.id === m.team2_player1_id);
+              const p4 = players.find(p => p.id === m.team2_player2_id);
 
-              {expandedTeam === result.team.id && (
-                <div className="border-t px-4 pb-4 pt-2">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-center">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="py-1 text-left pr-2">Hole</th>
-                          {Array.from({ length: 18 }, (_, i) => (
-                            <th key={i} className="py-1 w-6">{i + 1}</th>
-                          ))}
-                          <th className="py-1 pl-1">Tot</th>
-                        </tr>
-                        <tr className="border-b text-gray-400">
-                          <td className="py-1 text-left pr-2">Par</td>
-                          {PARS.map((p, i) => <td key={i}>{p}</td>)}
-                          <td className="pl-1">72</td>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[result.player1, result.player2].map(pr => (
-                          <tr key={pr.player.id} className="border-b">
-                            <td className="py-1 text-left pr-2 truncate max-w-[70px]">
-                              {pr.player.name} <span className="text-gray-400">({pr.player.handicap})</span>
-                            </td>
-                            {Array.from({ length: 18 }, (_, i) => {
-                              const s = pr.scores[i];
-                              if (!s) return <td key={i} className="text-gray-300">—</td>;
-                              const pts = getStablefordPoints(s.gross_score, i, pr.player.handicap);
-                              let color = '';
-                              if (pts === 0) color = 'text-red-500';
-                              else if (pts === 1) color = 'text-orange-500';
-                              else if (pts >= 3) color = 'text-blue-600 font-bold';
-                              return <td key={i} className={color}>{s.gross_score}</td>;
-                            })}
-                            <td className="pl-1 font-bold">{pr.totalStableford}</td>
-                          </tr>
-                        ))}
-                        <tr className="font-bold text-emerald-700">
-                          <td className="py-1 text-left pr-2">Best Ball</td>
-                          {result.bestBallByHole.map((pts, i) => (
-                            <td key={i}>{i < result.thruHole ? pts : '—'}</td>
-                          ))}
-                          <td className="pl-1">{result.bestBallTotal}</td>
-                        </tr>
-                      </tbody>
-                    </table>
+              let statusText = formatMatchStatus(result.status, result.thru);
+              let statusColor = 'text-gray-500';
+              if (result.status > 0) { statusColor = 'text-red-700'; statusText = `${result.team1Label} ${statusText}`; }
+              else if (result.status < 0) { statusColor = 'text-blue-700'; statusText = `${result.team2Label} ${statusText}`; }
+
+              return (
+                <div key={m.id} className="bg-gray-50 rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm">
+                      <span className="text-red-700 font-medium">{p1?.name} & {p2?.name}</span>
+                      <span className="text-gray-400 mx-2">vs</span>
+                      <span className="text-blue-700 font-medium">{p3?.name} & {p4?.name}</span>
+                    </div>
+                    {pts && (
+                      <div className="text-xs">
+                        <span className="text-red-700 font-bold">{pts.team1}</span>
+                        <span className="text-gray-400 mx-1">–</span>
+                        <span className="text-blue-700 font-bold">{pts.team2}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className={`text-sm font-semibold mt-1 ${statusColor}`}>
+                    {statusText}
                   </div>
                 </div>
-              )}
+              );
+            })}
+            <div className="flex justify-between text-sm font-bold pt-2 border-t">
+              <span className="text-red-700">Team Jordan: {r1JordanTotal}</span>
+              <span className="text-blue-700">Team Nolan: {r1NolanTotal}</span>
             </div>
-          ))}
+          </div>
+        </div>
+      )}
 
-          {teamResults.length === 0 && (
-            <div className="text-center py-12 text-gray-400">
-              No teams with scores yet. Waiting for scores to come in...
+      {/* R2: River High/Low */}
+      {r2Results.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-4">
+          <h3 className="font-bold mb-3">R2: The River — High/Low (2 pts/hole)</h3>
+          <div className="space-y-2">
+            {r2Results.map(({ match: m, result }) => {
+              const p1 = players.find(p => p.id === m.team1_player1_id);
+              const p2 = players.find(p => p.id === m.team1_player2_id);
+              const p3 = players.find(p => p.id === m.team2_player1_id);
+              const p4 = players.find(p => p.id === m.team2_player2_id);
+
+              return (
+                <div key={m.id} className="bg-gray-50 rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm">
+                      <span className="text-red-700 font-medium">{p1?.name} & {p2?.name}</span>
+                      <span className="text-gray-400 mx-2">vs</span>
+                      <span className="text-blue-700 font-medium">{p3?.name} & {p4?.name}</span>
+                    </div>
+                    <div className="text-sm font-bold">
+                      <span className="text-red-700">{result.team1Points}</span>
+                      <span className="text-gray-400 mx-1">–</span>
+                      <span className="text-blue-700">{result.team2Points}</span>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {result.thru === 0 ? 'Not started' : `Thru ${result.thru} · ${result.team1Points + result.team2Points} of ${result.thru * 2} pts awarded`}
+                  </div>
+                </div>
+              );
+            })}
+            <div className="flex justify-between text-sm font-bold pt-2 border-t">
+              <span className="text-red-700">Team Jordan: {r2JordanTotal}</span>
+              <span className="text-blue-700">Team Nolan: {r2NolanTotal}</span>
             </div>
-          )}
+          </div>
         </div>
-      ) : (
-        /* Individual Leaderboard */
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-gray-50 text-left text-gray-500">
-                <th className="p-3 w-10">#</th>
-                <th className="p-3">Player</th>
-                <th className="p-3 text-center">Hcp</th>
-                <th className="p-3 text-center">Thru</th>
-                <th className="p-3 text-right">Points</th>
-              </tr>
-            </thead>
-            <tbody>
-              {individualResults.map((pr, idx) => (
-                <tr key={pr.player.id} className="border-b last:border-0">
-                  <td className="p-3 font-medium text-gray-400">{idx + 1}</td>
-                  <td className="p-3 font-medium">{pr.player.name}</td>
-                  <td className="p-3 text-center text-gray-500">{pr.player.handicap}</td>
-                  <td className="p-3 text-center text-gray-500">{pr.thruHole}</td>
-                  <td className="p-3 text-right font-bold text-emerald-700">{pr.totalStableford}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {individualResults.length === 0 && (
-            <div className="text-center py-12 text-gray-400">No scores yet.</div>
-          )}
-        </div>
+      )}
+
+      {matches.length === 0 && (
+        <div className="text-center py-12 text-gray-400">No matches set up yet.</div>
       )}
     </div>
   );
