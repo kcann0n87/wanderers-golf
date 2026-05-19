@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Player, RyderMatch, Score, Settings } from '@/lib/types';
 import { STRAITS, RIVER, CourseData } from '@/lib/courses';
-import { getStrokesOnHole, getNetScore } from '@/lib/ryder';
+import { getStrokesOnHole, getNetScore, getAdjustedHandicaps } from '@/lib/ryder';
 import Link from 'next/link';
 
 export default function PlayPage({ params }: { params: Promise<{ code: string }> }) {
@@ -84,8 +84,13 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
     return scores.find(s => s.player_id === playerId && s.hole === hole);
   }
 
+  // Get adjusted handicaps (zeroed off lowest in the match)
+  const adjustedCH = match && players.length === 4
+    ? getAdjustedHandicaps(match, players, match.round)
+    : {};
+
   function getPlayerCH(player: Player): number {
-    return match?.round === 2 ? (player.course_handicap_river || 0) : (player.course_handicap_straits || 0);
+    return adjustedCH[player.id] || 0;
   }
 
   async function saveScore(playerId: string, hole: number, gross: number) {

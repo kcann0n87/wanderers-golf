@@ -2,6 +2,31 @@ import { CourseData } from './courses';
 import { Player, Score, RyderMatch } from './types';
 
 /**
+ * Get adjusted handicaps for a match — zeroed off the lowest CH in the foursome.
+ */
+export function getAdjustedHandicaps(
+  match: RyderMatch,
+  players: Player[],
+  round: number,
+): Record<string, number> {
+  const ids = [match.team1_player1_id, match.team1_player2_id, match.team2_player1_id, match.team2_player2_id];
+  const getCH = (id: string) => {
+    const p = players.find(pl => pl.id === id);
+    if (!p) return 0;
+    return round === 2 ? (p.course_handicap_river || 0) : (p.course_handicap_straits || 0);
+  };
+
+  const rawHandicaps = ids.map(id => getCH(id));
+  const lowest = Math.min(...rawHandicaps);
+
+  const adjusted: Record<string, number> = {};
+  ids.forEach(id => {
+    adjusted[id] = getCH(id) - lowest;
+  });
+  return adjusted;
+}
+
+/**
  * How many handicap strokes a player gets on a given hole.
  */
 export function getStrokesOnHole(courseHandicap: number, holeStrokeIndex: number): number {
@@ -38,7 +63,7 @@ export function calcBestBallMatch(
 
   if (!p1 || !p2 || !p3 || !p4) return { status: 0, thru: 0, holesRemaining: 18, team1Label: '', team2Label: '' };
 
-  const getCH = (p: Player) => p.course_handicap_straits || 0;
+  const adjusted = getAdjustedHandicaps(match, players, 1);
 
   let status = 0;
   let thru = 0;
@@ -53,10 +78,10 @@ export function calcBestBallMatch(
     // Need at least one score from each team
     if ((!s1 && !s2) || (!s3 && !s4)) continue;
 
-    const net1a = s1 ? getNetScore(s1.gross_score, getCH(p1), si) : 99;
-    const net1b = s2 ? getNetScore(s2.gross_score, getCH(p2), si) : 99;
-    const net2a = s3 ? getNetScore(s3.gross_score, getCH(p3), si) : 99;
-    const net2b = s4 ? getNetScore(s4.gross_score, getCH(p4), si) : 99;
+    const net1a = s1 ? getNetScore(s1.gross_score, adjusted[match.team1_player1_id], si) : 99;
+    const net1b = s2 ? getNetScore(s2.gross_score, adjusted[match.team1_player2_id], si) : 99;
+    const net2a = s3 ? getNetScore(s3.gross_score, adjusted[match.team2_player1_id], si) : 99;
+    const net2b = s4 ? getNetScore(s4.gross_score, adjusted[match.team2_player2_id], si) : 99;
 
     const team1Best = Math.min(net1a, net1b);
     const team2Best = Math.min(net2a, net2b);
@@ -108,7 +133,7 @@ export function calcHighLowMatch(
 
   if (!p1 || !p2 || !p3 || !p4) return { team1Points: 0, team2Points: 0, thru: 0, holeResults: [] };
 
-  const getCH = (p: Player) => p.course_handicap_river || 0;
+  const adjusted = getAdjustedHandicaps(match, players, 2);
 
   let team1Points = 0;
   let team2Points = 0;
@@ -124,10 +149,10 @@ export function calcHighLowMatch(
 
     if (!s1 || !s2 || !s3 || !s4) continue;
 
-    const net1a = getNetScore(s1.gross_score, getCH(p1), si);
-    const net1b = getNetScore(s2.gross_score, getCH(p2), si);
-    const net2a = getNetScore(s3.gross_score, getCH(p3), si);
-    const net2b = getNetScore(s4.gross_score, getCH(p4), si);
+    const net1a = getNetScore(s1.gross_score, adjusted[match.team1_player1_id], si);
+    const net1b = getNetScore(s2.gross_score, adjusted[match.team1_player2_id], si);
+    const net2a = getNetScore(s3.gross_score, adjusted[match.team2_player1_id], si);
+    const net2b = getNetScore(s4.gross_score, adjusted[match.team2_player2_id], si);
 
     // Low ball: best of each team
     const low1 = Math.min(net1a, net1b);
