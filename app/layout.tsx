@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Ryder Cup 2026',
+  title: 'Whistling 2026',
   description: 'Live Ryder Cup Tournament Tracker',
 };
 
@@ -32,11 +32,14 @@ export default function RootLayout({
         <nav className="bg-blue-950 text-white shadow-lg">
           <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
             <Link href="/" className="text-lg font-bold tracking-tight">
-              Ryder Cup 2026
+              Whistling 2026
             </Link>
             <div className="flex gap-4 text-sm">
               <Link href="/leaderboard" className="hover:text-yellow-300 transition-colors">
                 Leaderboard
+              </Link>
+              <Link href="/captain" className="hover:text-yellow-300 transition-colors">
+                Captain
               </Link>
               <Link href="/admin" className="hover:text-yellow-300 transition-colors">
                 Admin

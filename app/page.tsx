@@ -39,7 +39,7 @@ export default function Home() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-8">
       <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold text-blue-950">Ryder Cup 2026</h1>
+        <h1 className="text-3xl font-bold text-blue-950">Whistling 2026</h1>
         <p className="text-gray-600">Team Jordan vs Team Nolan</p>
       </div>
 
