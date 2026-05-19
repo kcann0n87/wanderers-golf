@@ -109,7 +109,7 @@ export default function LeaderboardPage() {
               const p4 = players.find(p => p.id === m.team2_player2_id);
 
               let statusText = formatMatchStatus(result.status, result.thru);
-              let statusColor = 'text-gray-500';
+              let statusColor = 'text-emerald-600 font-bold';
               if (result.status > 0) { statusColor = 'text-red-700'; statusText = `${result.team1Label} ${statusText}`; }
               else if (result.status < 0) { statusColor = 'text-blue-700'; statusText = `${result.team2Label} ${statusText}`; }
 

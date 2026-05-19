@@ -188,6 +188,6 @@ export function formatMatchStatus(status: number, thru: number): string {
     if (status === 0) return 'TIED';
     return `${Math.abs(status)} UP`;
   }
-  if (status === 0) return `AS thru ${thru}`;
+  if (status === 0) return `ALL SQUARE thru ${thru}`;
   return `${Math.abs(status)} UP thru ${thru}`;
 }
