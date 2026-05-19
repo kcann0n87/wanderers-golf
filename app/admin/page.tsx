@@ -13,9 +13,7 @@ function AdminDashboard() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<RyderMatch[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [editingPlayer, setEditingPlayer] = useState<string | null>(null);
-  const [editCHS, setEditCHS] = useState('');
-  const [editCHR, setEditCHR] = useState('');
+  const [localHandicaps, setLocalHandicaps] = useState<Record<string, { straits: string; river: string }>>({});
 
   // Match creation form
   const [matchRound, setMatchRound] = useState(1);
@@ -40,13 +38,23 @@ function AdminDashboard() {
   const jordanPlayers = players.filter(p => p.ryder_team === 'jordan');
   const nolanPlayers = players.filter(p => p.ryder_team === 'nolan');
 
-  async function updateHandicaps(playerId: string) {
+  function getLocal(p: Player) {
+    return localHandicaps[p.id] || { straits: String(p.course_handicap_straits || 0), river: String(p.course_handicap_river || 0) };
+  }
+
+  function setLocal(id: string, field: 'straits' | 'river', val: string) {
+    const p = players.find(pl => pl.id === id);
+    const existing = localHandicaps[id] || { straits: String(p?.course_handicap_straits || 0), river: String(p?.course_handicap_river || 0) };
+    setLocalHandicaps(prev => ({ ...prev, [id]: { ...existing, [field]: val } }));
+  }
+
+  async function saveHandicap(playerId: string) {
+    const p = players.find(pl => pl.id === playerId);
+    const local = localHandicaps[playerId] || { straits: String(p?.course_handicap_straits || 0), river: String(p?.course_handicap_river || 0) };
     await supabase.from('players').update({
-      course_handicap_straits: parseInt(editCHS) || 0,
-      course_handicap_river: parseInt(editCHR) || 0,
+      course_handicap_straits: parseInt(local.straits) || 0,
+      course_handicap_river: parseInt(local.river) || 0,
     }).eq('id', playerId);
-    setEditingPlayer(null);
-    fetchAll();
   }
 
   async function createMatch(e: React.FormEvent) {
@@ -121,38 +129,24 @@ function AdminDashboard() {
                   <th className="pb-1">Name</th>
                   <th className="pb-1 text-center">Straits CH</th>
                   <th className="pb-1 text-center">River CH</th>
-                  <th className="pb-1"></th>
                 </tr>
               </thead>
               <tbody>
                 {list.map(p => (
                   <tr key={p.id} className="border-b last:border-0">
                     <td className="py-1.5 font-medium">{p.name}</td>
-                    {editingPlayer === p.id ? (
-                      <>
-                        <td className="py-1.5 text-center">
-                          <input type="number" value={editCHS} onChange={e => setEditCHS(e.target.value)}
-                            className="w-14 px-1 py-0.5 border rounded text-center text-sm" />
-                        </td>
-                        <td className="py-1.5 text-center">
-                          <input type="number" value={editCHR} onChange={e => setEditCHR(e.target.value)}
-                            className="w-14 px-1 py-0.5 border rounded text-center text-sm" />
-                        </td>
-                        <td className="py-1.5 text-right">
-                          <button onClick={() => updateHandicaps(p.id)} className="text-blue-600 text-xs mr-1">Save</button>
-                          <button onClick={() => setEditingPlayer(null)} className="text-gray-400 text-xs">X</button>
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="py-1.5 text-center">{p.course_handicap_straits || 0}</td>
-                        <td className="py-1.5 text-center">{p.course_handicap_river || 0}</td>
-                        <td className="py-1.5 text-right">
-                          <button onClick={() => { setEditingPlayer(p.id); setEditCHS(String(p.course_handicap_straits || 0)); setEditCHR(String(p.course_handicap_river || 0)); }}
-                            className="text-blue-600 text-xs">Edit</button>
-                        </td>
-                      </>
-                    )}
+                    <td className="py-1.5 text-center">
+                      <input type="number" value={getLocal(p).straits}
+                        onChange={e => setLocal(p.id, 'straits', e.target.value)}
+                        onBlur={() => saveHandicap(p.id)}
+                        className="w-14 px-1 py-0.5 border rounded text-center text-sm" />
+                    </td>
+                    <td className="py-1.5 text-center">
+                      <input type="number" value={getLocal(p).river}
+                        onChange={e => setLocal(p.id, 'river', e.target.value)}
+                        onBlur={() => saveHandicap(p.id)}
+                        className="w-14 px-1 py-0.5 border rounded text-center text-sm" />
+                    </td>
                   </tr>
                 ))}
               </tbody>
