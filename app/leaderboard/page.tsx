@@ -49,7 +49,7 @@ export default function LeaderboardPage() {
   const r1Results = r1Matches.map(m => {
     const matchScores = scores.filter(s => s.match_id === m.id);
     const result = calcBestBallMatch(m, matchScores, STRAITS, players);
-    const complete = result.thru === 18;
+    const complete = result.thru === 18 || result.clinched;
     const pts = bestBallPoints(result.status, complete);
     if (pts) { r1JordanTotal += pts.team1; r1NolanTotal += pts.team2; }
     return { match: m, result, pts, complete };
@@ -108,10 +108,10 @@ export default function LeaderboardPage() {
               const p3 = players.find(p => p.id === m.team2_player1_id);
               const p4 = players.find(p => p.id === m.team2_player2_id);
 
-              let statusText = formatMatchStatus(result.status, result.thru);
+              let statusText = formatMatchStatus(result.status, result.thru, result.clinched);
               let statusColor = 'text-emerald-600 font-bold';
-              if (result.status > 0) { statusColor = 'text-red-700'; statusText = `${result.team1Label} ${statusText}`; }
-              else if (result.status < 0) { statusColor = 'text-blue-700'; statusText = `${result.team2Label} ${statusText}`; }
+              if (result.status > 0) { statusColor = 'text-red-700'; statusText = `${result.team1Label} ${result.clinched ? 'WIN ' : ''}${statusText}`; }
+              else if (result.status < 0) { statusColor = 'text-blue-700'; statusText = `${result.team2Label} ${result.clinched ? 'WIN ' : ''}${statusText}`; }
 
               return (
                 <div key={m.id} className="bg-gray-50 rounded-lg p-3">

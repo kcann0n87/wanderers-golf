@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Player, RyderMatch, Score, Settings } from '@/lib/types';
 import { STRAITS, RIVER, CourseData } from '@/lib/courses';
-import { getStrokesOnHole, getNetScore, getAdjustedHandicaps } from '@/lib/ryder';
+import { getStrokesOnHole, getNetScore, getAdjustedHandicaps, calcBestBallMatch, calcHighLowMatch, formatMatchStatus } from '@/lib/ryder';
 import Link from 'next/link';
 
 export default function PlayPage({ params }: { params: Promise<{ code: string }> }) {
@@ -150,6 +150,28 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
               <span className="text-gray-400 mx-2">vs</span>
               <span className="text-blue-700">{team2.map(p => p.name).join(' & ')}</span>
             </div>
+            {/* Live match score */}
+            {match && players.length === 4 && (() => {
+              if (match.round === 1) {
+                const r = calcBestBallMatch(match, scores, course, players);
+                if (r.thru === 0) return null;
+                const statusText = formatMatchStatus(r.status, r.thru, r.clinched);
+                let color = 'text-emerald-700';
+                let label = statusText;
+                if (r.status > 0) { color = 'text-red-700'; label = `${r.team1Label} ${r.clinched ? 'WIN ' : ''}${statusText}`; }
+                else if (r.status < 0) { color = 'text-blue-700'; label = `${r.team2Label} ${r.clinched ? 'WIN ' : ''}${statusText}`; }
+                return <div className={`text-sm font-bold mt-1 ${color}`}>{label}</div>;
+              } else {
+                const r = calcHighLowMatch(match, scores, course, players);
+                if (r.thru === 0) return null;
+                const diff = r.team1Points - r.team2Points;
+                let color = 'text-emerald-700';
+                let label = `Tied ${r.team1Points}–${r.team2Points}`;
+                if (diff > 0) { color = 'text-red-700'; label = `${team1.map(p => p.name.split(' ')[0]).join('/')} lead ${r.team1Points}–${r.team2Points}`; }
+                else if (diff < 0) { color = 'text-blue-700'; label = `${team2.map(p => p.name.split(' ')[0]).join('/')} lead ${r.team2Points}–${r.team1Points}`; }
+                return <div className={`text-sm font-bold mt-1 ${color}`}>{label} thru {r.thru}</div>;
+              }
+            })()}
           </div>
           <button
             onClick={() => { sessionStorage.setItem('scoringUrl', window.location.href); window.location.href = '/leaderboard'; }}
@@ -183,9 +205,9 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
       <div className="bg-white rounded-lg shadow p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold">Hole {activeHole}</h2>
-          <div className="flex gap-3 text-sm text-gray-500">
+          <div className="flex gap-3 text-lg font-bold text-black">
             <span>Par {par}</span>
-            <span>SI {si}</span>
+            <span>HCP {si}</span>
           </div>
         </div>
 

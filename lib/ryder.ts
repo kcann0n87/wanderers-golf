@@ -55,20 +55,25 @@ export function calcBestBallMatch(
   scores: Score[],
   course: CourseData,
   players: Player[],
-): { status: number; thru: number; holesRemaining: number; team1Label: string; team2Label: string } {
+): { status: number; thru: number; holesRemaining: number; clinched: boolean; clinchHole: number; team1Label: string; team2Label: string } {
   const p1 = players.find(p => p.id === match.team1_player1_id);
   const p2 = players.find(p => p.id === match.team1_player2_id);
   const p3 = players.find(p => p.id === match.team2_player1_id);
   const p4 = players.find(p => p.id === match.team2_player2_id);
 
-  if (!p1 || !p2 || !p3 || !p4) return { status: 0, thru: 0, holesRemaining: 18, team1Label: '', team2Label: '' };
+  if (!p1 || !p2 || !p3 || !p4) return { status: 0, thru: 0, holesRemaining: 18, clinched: false, clinchHole: 0, team1Label: '', team2Label: '' };
 
   const adjusted = getAdjustedHandicaps(match, players, 1);
 
   let status = 0;
   let thru = 0;
+  let clinched = false;
+  let clinchHole = 0;
 
   for (let hole = 1; hole <= 18; hole++) {
+    // If match is already clinched, stop processing further holes
+    if (clinched) break;
+
     const si = course.strokeIndex[hole - 1];
     const s1 = scores.find(s => s.player_id === match.team1_player1_id && s.hole === hole);
     const s2 = scores.find(s => s.player_id === match.team1_player2_id && s.hole === hole);
@@ -90,6 +95,13 @@ export function calcBestBallMatch(
     else if (team2Best < team1Best) status--;
 
     thru = hole;
+
+    // Check if match is clinched: lead > holes remaining
+    const remaining = 18 - hole;
+    if (Math.abs(status) > remaining) {
+      clinched = true;
+      clinchHole = hole;
+    }
   }
 
   const t1Name = `${p1.name.split(' ')[0]}/${p2.name.split(' ')[0]}`;
@@ -98,7 +110,9 @@ export function calcBestBallMatch(
   return {
     status,
     thru,
-    holesRemaining: 18 - thru,
+    holesRemaining: clinched ? 0 : 18 - thru,
+    clinched,
+    clinchHole,
     team1Label: t1Name,
     team2Label: t2Name,
   };
@@ -107,6 +121,7 @@ export function calcBestBallMatch(
 /**
  * R1: Convert best ball match result to points.
  * 10 for win, 5 for tie, 0 for loss.
+ * Match is complete if all 18 holes played OR if clinched early.
  */
 export function bestBallPoints(status: number, isComplete: boolean): { team1: number; team2: number } | null {
   if (!isComplete) return null;
@@ -181,9 +196,17 @@ export function calcHighLowMatch(
 
 /**
  * Format match status for display.
+ * clinched: match was won before hole 18 (e.g., "4&3" means 4 up with 3 to play)
  */
-export function formatMatchStatus(status: number, thru: number): string {
+export function formatMatchStatus(status: number, thru: number, clinched?: boolean): string {
   if (thru === 0) return 'Not started';
+
+  // Match clinched early — show "X&Y" format (e.g., "4&3")
+  if (clinched && status !== 0) {
+    const holesLeft = 18 - thru;
+    return `${Math.abs(status)}&${holesLeft}`;
+  }
+
   if (thru === 18) {
     if (status === 0) return 'TIED';
     return `${Math.abs(status)} UP`;
