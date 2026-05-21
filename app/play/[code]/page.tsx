@@ -223,7 +223,9 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
               const displayScore = currentGross || par;
               const net = currentGross ? getNetScore(currentGross, ch, si) : null;
               const diff = currentGross ? currentGross - par : 0;
-              const label2 = diff <= -2 ? 'Eagle' : diff === -1 ? 'Birdie' : diff === 0 ? 'Par' : diff === 1 ? 'Bogey' : diff === 2 ? 'Double' : `+${diff}`;
+              const maxScore = Math.max(par + 4, 10);
+              const isPickup = currentGross ? currentGross >= maxScore : false;
+              const label2 = isPickup ? 'Picked up' : diff <= -2 ? 'Eagle' : diff === -1 ? 'Birdie' : diff === 0 ? 'Par' : diff === 1 ? 'Bogey' : diff === 2 ? 'Double' : `+${diff}`;
 
               return (
                 <div key={player.id} className="border rounded-lg p-3 space-y-2">
@@ -243,10 +245,10 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
                       disabled={saving}
                       className="w-14 h-14 rounded-xl bg-blue-100 text-blue-700 text-2xl font-bold hover:bg-blue-200 active:bg-blue-300 disabled:opacity-30"
                     >−</button>
-                    <div className={`flex-1 text-center border-2 rounded-xl py-2 ${currentGross ? 'bg-gray-50 border-gray-200' : 'bg-gray-50 border-dashed border-gray-300'}`}>
-                      <div className="text-3xl font-bold">{currentGross || '—'}</div>
-                      <div className="text-xs font-semibold text-gray-500">
-                        {currentGross ? `${label2}${net !== null ? ` · Net ${net}` : ''}` : `Tap + for Par, − for Birdie`}
+                    <div className={`flex-1 text-center border-2 rounded-xl py-2 ${isPickup ? 'bg-gray-200 border-gray-400' : currentGross ? 'bg-gray-50 border-gray-200' : 'bg-gray-50 border-dashed border-gray-300'}`}>
+                      <div className="text-3xl font-bold">{isPickup ? 'X' : currentGross || '—'}</div>
+                      <div className={`text-xs font-semibold ${isPickup ? 'text-gray-600' : 'text-gray-500'}`}>
+                        {isPickup ? 'Picked up' : currentGross ? `${label2}${net !== null ? ` · Net ${net}` : ''}` : `Tap + for Par, − for Birdie`}
                       </div>
                     </div>
                     <button
@@ -257,10 +259,18 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
                       disabled={saving}
                       className="w-14 h-14 rounded-xl bg-red-100 text-red-700 text-2xl font-bold hover:bg-red-200 active:bg-red-300 disabled:opacity-30"
                     >+</button>
-                    {currentGross && (
-                      <button onClick={() => clearScore(player.id, activeHole)}
-                        className="w-10 h-10 rounded-lg text-xs text-red-500 border border-red-200 hover:bg-red-50">X</button>
-                    )}
+                    <button
+                      onClick={() => {
+                        const maxScore = Math.max(par + 4, 10);
+                        saveScore(player.id, activeHole, maxScore);
+                      }}
+                      disabled={saving}
+                      className={`w-12 h-14 rounded-xl text-sm font-bold transition-colors ${
+                        currentGross && currentGross >= Math.max(par + 4, 10)
+                          ? 'bg-gray-800 text-white'
+                          : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                      } disabled:opacity-30`}
+                    >X</button>
                   </div>
                 </div>
               );
