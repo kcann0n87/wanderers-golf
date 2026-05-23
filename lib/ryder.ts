@@ -3,26 +3,28 @@ import { Player, Score, RyderMatch } from './types';
 
 /**
  * Get adjusted handicaps for a match — zeroed off the lowest CH in the foursome.
+ * Uses per-match handicaps stored on the match itself.
  */
 export function getAdjustedHandicaps(
   match: RyderMatch,
   players: Player[],
   round: number,
 ): Record<string, number> {
-  const ids = [match.team1_player1_id, match.team1_player2_id, match.team2_player1_id, match.team2_player2_id];
-  const getCH = (id: string) => {
-    const p = players.find(pl => pl.id === id);
-    if (!p) return 0;
-    return round === 2 ? (p.course_handicap_river || 0) : (p.course_handicap_straits || 0);
+  // Use per-match handicaps
+  const rawMap: Record<string, number> = {
+    [match.team1_player1_id]: match.t1p1_ch || 0,
+    [match.team1_player2_id]: match.t1p2_ch || 0,
+    [match.team2_player1_id]: match.t2p1_ch || 0,
+    [match.team2_player2_id]: match.t2p2_ch || 0,
   };
 
-  const rawHandicaps = ids.map(id => getCH(id));
-  const lowest = Math.min(...rawHandicaps);
+  const rawValues = Object.values(rawMap);
+  const lowest = Math.min(...rawValues);
 
   const adjusted: Record<string, number> = {};
-  ids.forEach(id => {
-    adjusted[id] = getCH(id) - lowest;
-  });
+  for (const [id, ch] of Object.entries(rawMap)) {
+    adjusted[id] = ch - lowest;
+  }
   return adjusted;
 }
 

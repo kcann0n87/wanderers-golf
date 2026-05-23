@@ -212,27 +212,45 @@ function AdminDashboard() {
             <h2 className="text-lg font-semibold mb-3">
               {round === 1 ? 'R1: Straits — Best Ball' : 'R2: River — High/Low'}
             </h2>
-            <div className="space-y-2">
-              {roundMatches.map(m => (
-                <div key={m.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
-                  <div>
-                    <div className="font-medium text-sm">
-                      Match {m.match_number}:{' '}
-                      <span className="text-red-700">{m.team1_player1?.name} & {m.team1_player2?.name}</span>
-                      {' vs '}
-                      <span className="text-blue-700">{m.team2_player1?.name} & {m.team2_player2?.name}</span>
+            <div className="space-y-3">
+              {roundMatches.map(m => {
+                const matchPlayers = [
+                  { key: 't1p1_ch', player: m.team1_player1, color: 'text-red-700' },
+                  { key: 't1p2_ch', player: m.team1_player2, color: 'text-red-700' },
+                  { key: 't2p1_ch', player: m.team2_player1, color: 'text-blue-700' },
+                  { key: 't2p2_ch', player: m.team2_player2, color: 'text-blue-700' },
+                ];
+                return (
+                <div key={m.id} className="bg-gray-50 rounded-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-bold">Match {m.match_number}</div>
+                    <div className="flex items-center gap-3">
+                      <div className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded font-mono font-bold text-sm">
+                        PIN: {m.pin}
+                      </div>
+                      <button onClick={() => deleteMatch(m.id)} className="text-red-500 hover:text-red-700 text-xs">
+                        Delete
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded font-mono font-bold">
-                      PIN: {m.pin}
-                    </div>
-                    <button onClick={() => deleteMatch(m.id)} className="text-red-500 hover:text-red-700 text-xs">
-                      Delete
-                    </button>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                    {matchPlayers.map(({ key, player, color }) => (
+                      <div key={key} className="flex items-center justify-between">
+                        <span className={`text-sm font-medium ${color}`}>{player?.name}</span>
+                        <input
+                          type="number"
+                          defaultValue={(m as unknown as Record<string, number>)[key] || 0}
+                          onBlur={async (e) => {
+                            await supabase.from('ryder_matches').update({ [key]: parseInt(e.target.value) || 0 }).eq('id', m.id);
+                          }}
+                          className="w-14 px-1 py-0.5 border rounded text-center text-sm"
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         );

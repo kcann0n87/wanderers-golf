@@ -38,6 +38,10 @@ export interface RyderMatch {
   team1_player2_id: string;
   team2_player1_id: string;
   team2_player2_id: string;
+  t1p1_ch: number;
+  t1p2_ch: number;
+  t2p1_ch: number;
+  t2p2_ch: number;
   pin: string;
   created_at: string;
   // joined
