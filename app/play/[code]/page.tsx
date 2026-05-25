@@ -22,6 +22,7 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
   const [activeHole, setActiveHole] = useState(1);
   const [saving, setSaving] = useState(false);
   const initialLoadDone = useRef(false);
+  const [showScorecard, setShowScorecard] = useState(false);
 
   const course: CourseData = match?.round === 2 ? RIVER : STRAITS;
 
@@ -173,12 +174,20 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
               }
             })()}
           </div>
-          <button
-            onClick={() => { sessionStorage.setItem('scoringUrl', window.location.href); window.location.href = '/leaderboard'; }}
-            className="px-4 py-2 bg-blue-900 text-white text-sm font-medium rounded-lg hover:bg-blue-950"
-          >
-            Leaderboard
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowScorecard(!showScorecard)}
+              className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${showScorecard ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+            >
+              Scorecard
+            </button>
+            <button
+              onClick={() => { sessionStorage.setItem('scoringUrl', window.location.href); window.location.href = '/leaderboard'; }}
+              className="px-3 py-2 bg-blue-900 text-white text-sm font-medium rounded-lg hover:bg-blue-950"
+            >
+              Leaderboard
+            </button>
+          </div>
         </div>
       </div>
 
@@ -285,6 +294,123 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
             className="px-4 py-2 bg-blue-900 text-white rounded-lg disabled:opacity-30">Next Hole</button>
         </div>
       </div>
+
+      {/* Scorecard */}
+      {showScorecard && (
+        <div className="bg-white rounded-lg shadow p-4 overflow-x-auto">
+          <h3 className="font-bold mb-3">Scorecard</h3>
+          {/* Front 9 */}
+          <table className="w-full text-xs text-center mb-4" style={{ minWidth: 500 }}>
+            <thead>
+              <tr className="border-b">
+                <th className="py-1 text-left pr-1 w-16">Hole</th>
+                {Array.from({ length: 9 }, (_, i) => (
+                  <th key={i} className="py-1">{i + 1}</th>
+                ))}
+                <th className="py-1 font-bold">OUT</th>
+              </tr>
+              <tr className="border-b text-gray-400">
+                <td className="py-1 text-left pr-1">Par</td>
+                {course.pars.slice(0, 9).map((p, i) => <td key={i}>{p}</td>)}
+                <td className="font-bold">{course.pars.slice(0, 9).reduce((a, b) => a + b, 0)}</td>
+              </tr>
+              <tr className="border-b text-gray-400">
+                <td className="py-1 text-left pr-1">HCP</td>
+                {course.strokeIndex.slice(0, 9).map((h, i) => <td key={i}>{h}</td>)}
+                <td></td>
+              </tr>
+            </thead>
+            <tbody>
+              {[...team1, ...team2].map((player, idx) => {
+                const ch = getPlayerCH(player);
+                const isTeam2 = idx >= team1.length;
+                const color = isTeam2 ? 'text-blue-700' : 'text-red-700';
+                let front9Total = 0;
+                return (
+                  <tr key={player.id} className="border-b last:border-0">
+                    <td className={`py-1 text-left pr-1 font-medium ${color} truncate max-w-[64px]`}>{player.name}</td>
+                    {Array.from({ length: 9 }, (_, i) => {
+                      const s = getScore(player.id, i + 1);
+                      const maxScore = Math.max(course.pars[i] + 4, 10);
+                      const isPickup = s && s.gross_score >= maxScore;
+                      if (s && !isPickup) front9Total += s.gross_score;
+                      const strokes = getStrokesOnHole(ch, course.strokeIndex[i]);
+                      return (
+                        <td key={i} className="py-1 relative">
+                          {s ? (isPickup ? <span className="text-gray-400">X</span> : s.gross_score) : <span className="text-gray-300">—</span>}
+                          {strokes > 0 && <span className="absolute -top-0.5 -right-0.5 text-[8px] text-amber-600">●</span>}
+                        </td>
+                      );
+                    })}
+                    <td className="font-bold">{front9Total || '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {/* Back 9 */}
+          <table className="w-full text-xs text-center" style={{ minWidth: 500 }}>
+            <thead>
+              <tr className="border-b">
+                <th className="py-1 text-left pr-1 w-16">Hole</th>
+                {Array.from({ length: 9 }, (_, i) => (
+                  <th key={i} className="py-1">{i + 10}</th>
+                ))}
+                <th className="py-1 font-bold">IN</th>
+                <th className="py-1 font-bold">TOT</th>
+              </tr>
+              <tr className="border-b text-gray-400">
+                <td className="py-1 text-left pr-1">Par</td>
+                {course.pars.slice(9, 18).map((p, i) => <td key={i}>{p}</td>)}
+                <td className="font-bold">{course.pars.slice(9, 18).reduce((a, b) => a + b, 0)}</td>
+                <td className="font-bold">{course.totalPar}</td>
+              </tr>
+              <tr className="border-b text-gray-400">
+                <td className="py-1 text-left pr-1">HCP</td>
+                {course.strokeIndex.slice(9, 18).map((h, i) => <td key={i}>{h}</td>)}
+                <td></td>
+                <td></td>
+              </tr>
+            </thead>
+            <tbody>
+              {[...team1, ...team2].map((player, idx) => {
+                const ch = getPlayerCH(player);
+                const isTeam2 = idx >= team1.length;
+                const color = isTeam2 ? 'text-blue-700' : 'text-red-700';
+                let front9Total = 0;
+                let back9Total = 0;
+                // Calculate front 9 total for grand total
+                for (let i = 0; i < 9; i++) {
+                  const s = getScore(player.id, i + 1);
+                  const maxScore = Math.max(course.pars[i] + 4, 10);
+                  if (s && s.gross_score < maxScore) front9Total += s.gross_score;
+                }
+                return (
+                  <tr key={player.id} className="border-b last:border-0">
+                    <td className={`py-1 text-left pr-1 font-medium ${color} truncate max-w-[64px]`}>{player.name}</td>
+                    {Array.from({ length: 9 }, (_, i) => {
+                      const holeIdx = i + 9;
+                      const s = getScore(player.id, holeIdx + 1);
+                      const maxScore = Math.max(course.pars[holeIdx] + 4, 10);
+                      const isPickup = s && s.gross_score >= maxScore;
+                      if (s && !isPickup) back9Total += s.gross_score;
+                      const strokes = getStrokesOnHole(ch, course.strokeIndex[holeIdx]);
+                      return (
+                        <td key={i} className="py-1 relative">
+                          {s ? (isPickup ? <span className="text-gray-400">X</span> : s.gross_score) : <span className="text-gray-300">—</span>}
+                          {strokes > 0 && <span className="absolute -top-0.5 -right-0.5 text-[8px] text-amber-600">●</span>}
+                        </td>
+                      );
+                    })}
+                    <td className="font-bold">{back9Total || '—'}</td>
+                    <td className="font-bold">{(front9Total + back9Total) || '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
