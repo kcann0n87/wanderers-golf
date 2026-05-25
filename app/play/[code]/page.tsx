@@ -232,8 +232,8 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
               const displayScore = currentGross || par;
               const net = currentGross ? getNetScore(currentGross, ch, si) : null;
               const diff = currentGross ? currentGross - par : 0;
-              const maxScore = Math.max(par + 4, 10);
-              const isPickup = currentGross ? currentGross >= maxScore : false;
+              const maxGross = par + 4 + strokes; // net quad bogey
+              const isPickup = currentGross ? currentGross >= maxGross : false;
               const label2 = isPickup ? 'Picked up' : diff <= -2 ? 'Eagle' : diff === -1 ? 'Birdie' : diff === 0 ? 'Par' : diff === 1 ? 'Bogey' : diff === 2 ? 'Double' : `+${diff}`;
 
               return (
@@ -269,13 +269,10 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
                       className="w-14 h-14 rounded-xl bg-red-100 text-red-700 text-2xl font-bold hover:bg-red-200 active:bg-red-300 disabled:opacity-30"
                     >+</button>
                     <button
-                      onClick={() => {
-                        const maxScore = Math.max(par + 4, 10);
-                        saveScore(player.id, activeHole, maxScore);
-                      }}
+                      onClick={() => saveScore(player.id, activeHole, maxGross)}
                       disabled={saving}
                       className={`w-12 h-14 rounded-xl text-sm font-bold transition-colors ${
-                        currentGross && currentGross >= Math.max(par + 4, 10)
+                        isPickup
                           ? 'bg-gray-800 text-white'
                           : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
                       } disabled:opacity-30`}
@@ -331,7 +328,7 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
                     <td className={`py-1 text-left pr-1 font-medium ${color} truncate max-w-[64px]`}>{player.name}</td>
                     {Array.from({ length: 9 }, (_, i) => {
                       const s = getScore(player.id, i + 1);
-                      const maxScore = Math.max(course.pars[i] + 4, 10);
+                      const maxScore = course.pars[i] + 4 + getStrokesOnHole(ch, course.strokeIndex[i]);
                       const isPickup = s && s.gross_score >= maxScore;
                       if (s && !isPickup) front9Total += s.gross_score;
                       const strokes = getStrokesOnHole(ch, course.strokeIndex[i]);
@@ -382,7 +379,7 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
                 // Calculate front 9 total for grand total
                 for (let i = 0; i < 9; i++) {
                   const s = getScore(player.id, i + 1);
-                  const maxScore = Math.max(course.pars[i] + 4, 10);
+                  const maxScore = course.pars[i] + 4 + getStrokesOnHole(ch, course.strokeIndex[i]);
                   if (s && s.gross_score < maxScore) front9Total += s.gross_score;
                 }
                 return (
@@ -391,7 +388,7 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
                     {Array.from({ length: 9 }, (_, i) => {
                       const holeIdx = i + 9;
                       const s = getScore(player.id, holeIdx + 1);
-                      const maxScore = Math.max(course.pars[holeIdx] + 4, 10);
+                      const maxScore = course.pars[holeIdx] + 4 + getStrokesOnHole(ch, course.strokeIndex[holeIdx]);
                       const isPickup = s && s.gross_score >= maxScore;
                       if (s && !isPickup) back9Total += s.gross_score;
                       const strokes = getStrokesOnHole(ch, course.strokeIndex[holeIdx]);

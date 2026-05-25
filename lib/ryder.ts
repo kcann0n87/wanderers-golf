@@ -48,6 +48,16 @@ export function getNetScore(gross: number, courseHandicap: number, holeStrokeInd
 }
 
 /**
+ * Get net score capped at net quadruple bogey (par + 4).
+ * Any score worse than net quad bogey (including pickups) is treated as par + 4.
+ */
+export function getCappedNetScore(gross: number, courseHandicap: number, holeStrokeIndex: number, par: number): number {
+  const net = getNetScore(gross, courseHandicap, holeStrokeIndex);
+  const maxNet = par + 4;
+  return Math.min(net, maxNet);
+}
+
+/**
  * R1: Best Ball match status.
  * Returns the match status from Team1's perspective.
  * Positive = Team1 up, Negative = Team2 up, 0 = All Square.
@@ -85,10 +95,11 @@ export function calcBestBallMatch(
     // Need at least one score from each team
     if ((!s1 && !s2) || (!s3 && !s4)) continue;
 
-    const net1a = s1 ? getNetScore(s1.gross_score, adjusted[match.team1_player1_id], si) : 99;
-    const net1b = s2 ? getNetScore(s2.gross_score, adjusted[match.team1_player2_id], si) : 99;
-    const net2a = s3 ? getNetScore(s3.gross_score, adjusted[match.team2_player1_id], si) : 99;
-    const net2b = s4 ? getNetScore(s4.gross_score, adjusted[match.team2_player2_id], si) : 99;
+    const par = course.pars[hole - 1];
+    const net1a = s1 ? getCappedNetScore(s1.gross_score, adjusted[match.team1_player1_id], si, par) : 99;
+    const net1b = s2 ? getCappedNetScore(s2.gross_score, adjusted[match.team1_player2_id], si, par) : 99;
+    const net2a = s3 ? getCappedNetScore(s3.gross_score, adjusted[match.team2_player1_id], si, par) : 99;
+    const net2b = s4 ? getCappedNetScore(s4.gross_score, adjusted[match.team2_player2_id], si, par) : 99;
 
     const team1Best = Math.min(net1a, net1b);
     const team2Best = Math.min(net2a, net2b);
@@ -166,15 +177,16 @@ export function calcHighLowMatch(
 
     if (!s1 || !s2 || !s3 || !s4) continue;
 
-    const net1a = getNetScore(s1.gross_score, adjusted[match.team1_player1_id], si);
-    const net1b = getNetScore(s2.gross_score, adjusted[match.team1_player2_id], si);
-    const net2a = getNetScore(s3.gross_score, adjusted[match.team2_player1_id], si);
-    const net2b = getNetScore(s4.gross_score, adjusted[match.team2_player2_id], si);
+    const par = course.pars[hole - 1];
+    const net1a = getCappedNetScore(s1.gross_score, adjusted[match.team1_player1_id], si, par);
+    const net1b = getCappedNetScore(s2.gross_score, adjusted[match.team1_player2_id], si, par);
+    const net2a = getCappedNetScore(s3.gross_score, adjusted[match.team2_player1_id], si, par);
+    const net2b = getCappedNetScore(s4.gross_score, adjusted[match.team2_player2_id], si, par);
 
     // Low ball: best of each team
     const low1 = Math.min(net1a, net1b);
     const low2 = Math.min(net2a, net2b);
-    // High ball: worst of each team
+    // High ball: worst of each team (capped at net quad bogey, so ties if both maxed)
     const high1 = Math.max(net1a, net1b);
     const high2 = Math.max(net2a, net2b);
 
