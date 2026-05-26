@@ -183,13 +183,13 @@ function CaptainDashboard() {
       </section>
 
       {/* Matches List */}
-      {[1, 2].map(round => {
+      {[1, 2, 3].map(round => {
         const roundMatches = matches.filter(m => m.round === round);
         if (roundMatches.length === 0) return null;
         return (
           <section key={round} className="bg-white rounded-lg shadow p-4">
             <h2 className="text-lg font-semibold mb-3">
-              {round === 1 ? 'R1: Straits — Best Ball' : 'R2: River — High/Low'}
+              {round === 1 ? 'R1: Straits — Best Ball' : round === 2 ? 'R2: River — High/Low' : 'R3: Irish — Nassau'}
             </h2>
             <div className="space-y-3">
               {roundMatches.map(m => {
