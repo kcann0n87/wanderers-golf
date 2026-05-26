@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Player, RyderMatch, Score, Settings } from '@/lib/types';
 import { STRAITS, RIVER, CourseData } from '@/lib/courses';
-import { getStrokesOnHole, getNetScore, getAdjustedHandicaps, calcBestBallMatch, calcHighLowMatch, formatMatchStatus } from '@/lib/ryder';
+import { getStrokesOnHole, getNetScore, getAdjustedHandicaps, calcBestBallMatch, calcHighLowMatch, calcNassauMatch, formatMatchStatus } from '@/lib/ryder';
 import Link from 'next/link';
 
 export default function PlayPage({ params }: { params: Promise<{ code: string }> }) {
@@ -24,7 +24,7 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
   const initialLoadDone = useRef(false);
   const [showScorecard, setShowScorecard] = useState(false);
 
-  const course: CourseData = match?.round === 2 ? RIVER : STRAITS;
+  const course: CourseData = match?.round === 2 ? RIVER : STRAITS; // R1 and R3 use Straits, R2 uses River
 
   async function fetchData() {
     const { data: matchData } = await supabase
@@ -137,7 +137,7 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
   const team1 = players.filter(p => p.id === match?.team1_player1_id || p.id === match?.team1_player2_id);
   const team2 = players.filter(p => p.id === match?.team2_player1_id || p.id === match?.team2_player2_id);
 
-  const roundLabel = match?.round === 1 ? 'R1: Straits — Best Ball' : 'R2: River — High/Low';
+  const roundLabel = match?.round === 1 ? 'R1: Straits — Best Ball' : match?.round === 2 ? 'R2: River — High/Low' : 'R3: Straits — Nassau';
 
   return (
     <div className="space-y-4">
@@ -153,7 +153,28 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
             </div>
             {/* Live match score */}
             {match && players.length === 4 && (() => {
-              if (match.round === 1) {
+              if (match.round === 1 || match.round === 3) {
+                if (match.round === 3) {
+                  const r = calcNassauMatch(match, scores, course, players);
+                  if (r.totalThru === 0) return null;
+                  const parts: string[] = [];
+                  if (r.frontThru > 0) {
+                    const fs = r.frontComplete ? (r.frontStatus > 0 ? `F: ${r.team1Label}` : r.frontStatus < 0 ? `F: ${r.team2Label}` : 'F: Tied') : `F: ${r.frontStatus === 0 ? 'AS' : r.frontStatus > 0 ? `${r.team1Label} ${r.frontStatus}UP` : `${r.team2Label} ${Math.abs(r.frontStatus)}UP`} thru ${r.frontThru}`;
+                    parts.push(fs);
+                  }
+                  if (r.backThru > 9) {
+                    const bs = r.backComplete ? (r.backStatus > 0 ? `B: ${r.team1Label}` : r.backStatus < 0 ? `B: ${r.team2Label}` : 'B: Tied') : `B: ${r.backStatus === 0 ? 'AS' : r.backStatus > 0 ? `${r.team1Label} ${r.backStatus}UP` : `${r.team2Label} ${Math.abs(r.backStatus)}UP`} thru ${r.backThru}`;
+                    parts.push(bs);
+                  }
+                  const diff = r.team1Points - r.team2Points;
+                  const color = diff > 0 ? 'text-red-700' : diff < 0 ? 'text-blue-700' : 'text-emerald-700';
+                  return (
+                    <div className="mt-1 space-y-0.5">
+                      <div className={`text-sm font-bold ${color}`}>Nassau: {r.team1Points}–{r.team2Points}</div>
+                      <div className="text-xs text-gray-500">{parts.join(' | ')}</div>
+                    </div>
+                  );
+                }
                 const r = calcBestBallMatch(match, scores, course, players);
                 if (r.thru === 0) return null;
                 const statusText = formatMatchStatus(r.status, r.thru, r.clinched);

@@ -140,32 +140,42 @@ function CaptainDashboard() {
               className="px-3 py-2 border rounded-lg">
               <option value={1}>R1: Straits (Best Ball)</option>
               <option value={2}>R2: River (High/Low)</option>
+              <option value={3}>R3: Nassau (Best Ball)</option>
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <div className="text-xs font-bold text-red-700 uppercase">Team Jordan</div>
-              <select value={t1p1} onChange={e => setT1p1(e.target.value)} className="w-full px-3 py-2 border rounded-lg">
-                <option value="">Player 1...</option>
-                {jordanPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-              <select value={t1p2} onChange={e => setT1p2(e.target.value)} className="w-full px-3 py-2 border rounded-lg">
-                <option value="">Player 2...</option>
-                {jordanPlayers.filter(p => p.id !== t1p1).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+          {(() => {
+            const side1 = matchRound === 3 ? players : jordanPlayers;
+            const side2 = matchRound === 3 ? players : nolanPlayers;
+            const label1 = matchRound === 3 ? 'Team 1' : 'Team Jordan';
+            const label2 = matchRound === 3 ? 'Team 2' : 'Team Nolan';
+            const selectedIds = [t1p1, t1p2, t2p1, t2p2].filter(Boolean);
+            return (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="text-xs font-bold text-red-700 uppercase">{label1}</div>
+                <select value={t1p1} onChange={e => setT1p1(e.target.value)} className="w-full px-3 py-2 border rounded-lg">
+                  <option value="">Player 1...</option>
+                  {side1.filter(p => !selectedIds.includes(p.id) || p.id === t1p1).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <select value={t1p2} onChange={e => setT1p2(e.target.value)} className="w-full px-3 py-2 border rounded-lg">
+                  <option value="">Player 2...</option>
+                  {side1.filter(p => !selectedIds.includes(p.id) || p.id === t1p2).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <div className="text-xs font-bold text-blue-700 uppercase">{label2}</div>
+                <select value={t2p1} onChange={e => setT2p1(e.target.value)} className="w-full px-3 py-2 border rounded-lg">
+                  <option value="">Player 1...</option>
+                  {side2.filter(p => !selectedIds.includes(p.id) || p.id === t2p1).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <select value={t2p2} onChange={e => setT2p2(e.target.value)} className="w-full px-3 py-2 border rounded-lg">
+                  <option value="">Player 2...</option>
+                  {side2.filter(p => !selectedIds.includes(p.id) || p.id === t2p2).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
             </div>
-            <div className="space-y-2">
-              <div className="text-xs font-bold text-blue-700 uppercase">Team Nolan</div>
-              <select value={t2p1} onChange={e => setT2p1(e.target.value)} className="w-full px-3 py-2 border rounded-lg">
-                <option value="">Player 1...</option>
-                {nolanPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-              <select value={t2p2} onChange={e => setT2p2(e.target.value)} className="w-full px-3 py-2 border rounded-lg">
-                <option value="">Player 2...</option>
-                {nolanPlayers.filter(p => p.id !== t2p1).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-          </div>
+            );
+          })()}
           <button type="submit" className="px-6 py-2 bg-blue-900 text-white rounded-lg hover:bg-blue-950">
             Create Match
           </button>

@@ -228,3 +228,115 @@ export function formatMatchStatus(status: number, thru: number, clinched?: boole
   if (status === 0) return `ALL SQUARE thru ${thru}`;
   return `${Math.abs(status)} UP thru ${thru}`;
 }
+
+/**
+ * R3: Nassau — Best Ball, 1 point each for front 9, back 9, and overall total.
+ * Returns who wins each segment (or tie).
+ */
+export function calcNassauMatch(
+  match: RyderMatch,
+  scores: Score[],
+  course: CourseData,
+  players: Player[],
+): {
+  frontStatus: number; frontThru: number; frontComplete: boolean;
+  backStatus: number; backThru: number; backComplete: boolean;
+  totalStatus: number; totalThru: number;
+  team1Points: number; team2Points: number;
+  team1Label: string; team2Label: string;
+} {
+  const p1 = players.find(p => p.id === match.team1_player1_id);
+  const p2 = players.find(p => p.id === match.team1_player2_id);
+  const p3 = players.find(p => p.id === match.team2_player1_id);
+  const p4 = players.find(p => p.id === match.team2_player2_id);
+
+  const empty = { frontStatus: 0, frontThru: 0, frontComplete: false, backStatus: 0, backThru: 0, backComplete: false, totalStatus: 0, totalThru: 0, team1Points: 0, team2Points: 0, team1Label: '', team2Label: '' };
+  if (!p1 || !p2 || !p3 || !p4) return empty;
+
+  const adjusted = getAdjustedHandicaps(match, players, 3);
+
+  let frontStatus = 0;
+  let frontThru = 0;
+  let backStatus = 0;
+  let backThru = 0;
+
+  // Front 9
+  for (let hole = 1; hole <= 9; hole++) {
+    const si = course.strokeIndex[hole - 1];
+    const par = course.pars[hole - 1];
+    const s1 = scores.find(s => s.player_id === match.team1_player1_id && s.hole === hole);
+    const s2 = scores.find(s => s.player_id === match.team1_player2_id && s.hole === hole);
+    const s3 = scores.find(s => s.player_id === match.team2_player1_id && s.hole === hole);
+    const s4 = scores.find(s => s.player_id === match.team2_player2_id && s.hole === hole);
+    if ((!s1 && !s2) || (!s3 && !s4)) continue;
+    const net1 = Math.min(
+      s1 ? getCappedNetScore(s1.gross_score, adjusted[match.team1_player1_id], si, par) : 99,
+      s2 ? getCappedNetScore(s2.gross_score, adjusted[match.team1_player2_id], si, par) : 99,
+    );
+    const net2 = Math.min(
+      s3 ? getCappedNetScore(s3.gross_score, adjusted[match.team2_player1_id], si, par) : 99,
+      s4 ? getCappedNetScore(s4.gross_score, adjusted[match.team2_player2_id], si, par) : 99,
+    );
+    if (net1 < net2) frontStatus++;
+    else if (net2 < net1) frontStatus--;
+    frontThru = hole;
+  }
+
+  // Back 9
+  for (let hole = 10; hole <= 18; hole++) {
+    const si = course.strokeIndex[hole - 1];
+    const par = course.pars[hole - 1];
+    const s1 = scores.find(s => s.player_id === match.team1_player1_id && s.hole === hole);
+    const s2 = scores.find(s => s.player_id === match.team1_player2_id && s.hole === hole);
+    const s3 = scores.find(s => s.player_id === match.team2_player1_id && s.hole === hole);
+    const s4 = scores.find(s => s.player_id === match.team2_player2_id && s.hole === hole);
+    if ((!s1 && !s2) || (!s3 && !s4)) continue;
+    const net1 = Math.min(
+      s1 ? getCappedNetScore(s1.gross_score, adjusted[match.team1_player1_id], si, par) : 99,
+      s2 ? getCappedNetScore(s2.gross_score, adjusted[match.team1_player2_id], si, par) : 99,
+    );
+    const net2 = Math.min(
+      s3 ? getCappedNetScore(s3.gross_score, adjusted[match.team2_player1_id], si, par) : 99,
+      s4 ? getCappedNetScore(s4.gross_score, adjusted[match.team2_player2_id], si, par) : 99,
+    );
+    if (net1 < net2) backStatus++;
+    else if (net2 < net1) backStatus--;
+    backThru = hole;
+  }
+
+  const frontComplete = frontThru === 9;
+  const backComplete = backThru === 18;
+  const totalStatus = frontStatus + backStatus;
+  const totalThru = Math.max(frontThru, backThru);
+
+  // Points: 1 each for front/back/total winner. Ties = 0.5 each.
+  let team1Points = 0;
+  let team2Points = 0;
+
+  if (frontComplete) {
+    if (frontStatus > 0) team1Points += 1;
+    else if (frontStatus < 0) team2Points += 1;
+    else { team1Points += 0.5; team2Points += 0.5; }
+  }
+  if (backComplete) {
+    if (backStatus > 0) team1Points += 1;
+    else if (backStatus < 0) team2Points += 1;
+    else { team1Points += 0.5; team2Points += 0.5; }
+  }
+  if (frontComplete && backComplete) {
+    if (totalStatus > 0) team1Points += 1;
+    else if (totalStatus < 0) team2Points += 1;
+    else { team1Points += 0.5; team2Points += 0.5; }
+  }
+
+  const t1Name = `${p1.name.split(' ')[0]}/${p2.name.split(' ')[0]}`;
+  const t2Name = `${p3.name.split(' ')[0]}/${p4.name.split(' ')[0]}`;
+
+  return {
+    frontStatus, frontThru, frontComplete,
+    backStatus, backThru, backComplete,
+    totalStatus, totalThru,
+    team1Points, team2Points,
+    team1Label: t1Name, team2Label: t2Name,
+  };
+}
