@@ -21,7 +21,15 @@ export const RIVER: CourseData = {
   totalPar: 72,
 };
 
+export const IRISH: CourseData = {
+  name: 'The Irish',
+  pars: [4, 4, 3, 4, 5, 3, 4, 5, 4, 4, 3, 4, 3, 5, 4, 4, 4, 5],
+  strokeIndex: [4, 6, 18, 2, 14, 16, 12, 10, 8, 5, 15, 13, 17, 11, 1, 3, 7, 9],
+  totalPar: 72,
+};
+
 export const COURSES: Record<string, CourseData> = {
   straits: STRAITS,
   river: RIVER,
+  irish: IRISH,
 };

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Player, RyderMatch, Score } from '@/lib/types';
-import { STRAITS, RIVER } from '@/lib/courses';
+import { STRAITS, RIVER, IRISH } from '@/lib/courses';
 import { calcBestBallMatch, calcHighLowMatch, calcNassauMatch, bestBallPoints, formatMatchStatus } from '@/lib/ryder';
 
 export default function LeaderboardPage() {
@@ -73,7 +73,7 @@ export default function LeaderboardPage() {
   let r3Team2Total = 0;
   const r3Results = r3Matches.map(m => {
     const matchScores = scores.filter(s => s.match_id === m.id);
-    const result = calcNassauMatch(m, matchScores, STRAITS, players);
+    const result = calcNassauMatch(m, matchScores, IRISH, players);
     r3Team1Total += result.team1Points;
     r3Team2Total += result.team2Points;
     return { match: m, result };

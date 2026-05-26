@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, use } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Player, RyderMatch, Score, Settings } from '@/lib/types';
-import { STRAITS, RIVER, CourseData } from '@/lib/courses';
+import { STRAITS, RIVER, IRISH, CourseData } from '@/lib/courses';
 import { getStrokesOnHole, getNetScore, getAdjustedHandicaps, calcBestBallMatch, calcHighLowMatch, calcNassauMatch, formatMatchStatus } from '@/lib/ryder';
 import Link from 'next/link';
 
@@ -24,7 +24,7 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
   const initialLoadDone = useRef(false);
   const [showScorecard, setShowScorecard] = useState(false);
 
-  const course: CourseData = match?.round === 2 ? RIVER : STRAITS; // R1 and R3 use Straits, R2 uses River
+  const course: CourseData = match?.round === 2 ? RIVER : match?.round === 3 ? IRISH : STRAITS;
 
   async function fetchData() {
     const { data: matchData } = await supabase
@@ -137,7 +137,7 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
   const team1 = players.filter(p => p.id === match?.team1_player1_id || p.id === match?.team1_player2_id);
   const team2 = players.filter(p => p.id === match?.team2_player1_id || p.id === match?.team2_player2_id);
 
-  const roundLabel = match?.round === 1 ? 'R1: Straits — Best Ball' : match?.round === 2 ? 'R2: River — High/Low' : 'R3: Straits — Nassau';
+  const roundLabel = match?.round === 1 ? 'R1: Straits — Best Ball' : match?.round === 2 ? 'R2: River — High/Low' : 'R3: Irish — Nassau';
 
   return (
     <div className="space-y-4">
