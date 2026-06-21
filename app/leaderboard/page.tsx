@@ -146,7 +146,7 @@ export default function LeaderboardPage() {
                   const p4 = players.find(p => p.id === m.team2_player2_id);
 
                   const matchScores = scores.filter(s => s.match_id === m.id);
-                  const hasMC = (pid: string) => matchScores.filter(s => s.player_id === pid).length === 0 && result.thru > 0;
+                  const hasMC = (pid: string) => matchScores.filter(s => s.player_id === pid).length === 0 && result.totalThru > 0;
 
                   const parts: string[] = [];
                   if (result.frontThru > 0) {
