@@ -145,6 +145,9 @@ export default function LeaderboardPage() {
                   const p3 = players.find(p => p.id === m.team2_player1_id);
                   const p4 = players.find(p => p.id === m.team2_player2_id);
 
+                  const matchScores = scores.filter(s => s.match_id === m.id);
+                  const hasMC = (pid: string) => matchScores.filter(s => s.player_id === pid).length === 0 && result.thru > 0;
+
                   const parts: string[] = [];
                   if (result.frontThru > 0) {
                     if (result.frontComplete) {
@@ -165,9 +168,17 @@ export default function LeaderboardPage() {
                     <div key={m.id} className="bg-gray-50 rounded-lg p-3">
                       <div className="flex items-center justify-between">
                         <div className="text-sm">
-                          <span className="text-red-700 font-medium">{p1?.name} & {p2?.name}</span>
+                          <span className="text-red-700 font-medium">
+                            {p1?.name}{hasMC(m.team1_player1_id) && <span className="ml-1 text-xs bg-gray-800 text-white px-1 py-0.5 rounded">MC</span>}
+                            {' & '}
+                            {p2?.name}{hasMC(m.team1_player2_id) && <span className="ml-1 text-xs bg-gray-800 text-white px-1 py-0.5 rounded">MC</span>}
+                          </span>
                           <span className="text-gray-400 mx-2">vs</span>
-                          <span className="text-blue-700 font-medium">{p3?.name} & {p4?.name}</span>
+                          <span className="text-blue-700 font-medium">
+                            {p3?.name}{hasMC(m.team2_player1_id) && <span className="ml-1 text-xs bg-gray-800 text-white px-1 py-0.5 rounded">MC</span>}
+                            {' & '}
+                            {p4?.name}{hasMC(m.team2_player2_id) && <span className="ml-1 text-xs bg-gray-800 text-white px-1 py-0.5 rounded">MC</span>}
+                          </span>
                         </div>
                         <div className="text-sm font-bold">
                           <span className="text-red-700">{result.team1Points}</span>
