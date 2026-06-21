@@ -87,7 +87,7 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
 
   // Get adjusted handicaps (zeroed off lowest in the match)
   const adjustedCH = match && players.length === 4
-    ? getAdjustedHandicaps(match, players, match.round)
+    ? getAdjustedHandicaps(match, players, match.round, scores)
     : {};
 
   function getPlayerCH(player: Player): number {

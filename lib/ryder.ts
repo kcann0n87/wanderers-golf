@@ -9,7 +9,10 @@ export function getAdjustedHandicaps(
   match: RyderMatch,
   players: Player[],
   round: number,
+  scores?: Score[],
 ): Record<string, number> {
+  const ids = [match.team1_player1_id, match.team1_player2_id, match.team2_player1_id, match.team2_player2_id];
+
   // Use per-match handicaps
   const rawMap: Record<string, number> = {
     [match.team1_player1_id]: match.t1p1_ch || 0,
@@ -18,8 +21,16 @@ export function getAdjustedHandicaps(
     [match.team2_player2_id]: match.t2p2_ch || 0,
   };
 
-  const rawValues = Object.values(rawMap);
-  const lowest = Math.min(...rawValues);
+  // If scores provided, exclude MC players (no scores) from lowest calculation
+  let activeIds = ids;
+  if (scores) {
+    const playerIdsWithScores = new Set(scores.map(s => s.player_id));
+    const playing = ids.filter(id => playerIdsWithScores.has(id));
+    if (playing.length > 0) activeIds = playing;
+  }
+
+  const activeValues = activeIds.map(id => rawMap[id]);
+  const lowest = Math.min(...activeValues);
 
   const adjusted: Record<string, number> = {};
   for (const [id, ch] of Object.entries(rawMap)) {
@@ -253,7 +264,7 @@ export function calcNassauMatch(
   const empty = { frontStatus: 0, frontThru: 0, frontComplete: false, backStatus: 0, backThru: 0, backComplete: false, totalStatus: 0, totalThru: 0, team1Points: 0, team2Points: 0, team1Label: '', team2Label: '' };
   if (!p1 || !p2 || !p3 || !p4) return empty;
 
-  const adjusted = getAdjustedHandicaps(match, players, 3);
+  const adjusted = getAdjustedHandicaps(match, players, 3, scores);
 
   let frontStatus = 0;
   let frontThru = 0;
